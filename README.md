@@ -286,7 +286,7 @@ Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the
 
 ## License
 
-[MIT](LICENSE) © 2026 Angad
+[MIT](LICENSE) © 2026 Angad Singh Bains
 
 Exchange-rate data is provided by
 [ExchangeRate-API](https://www.exchangerate-api.com) and is not covered by this
