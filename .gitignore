@@ -1,0 +1,38 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# Android build output
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+bin/
+gen/
+out/
+release/
+
+# Machine-specific SDK location — never commit
+local.properties
+
+# Signing material — never commit
+*.jks
+*.keystore
+keystore.properties
+
+# IDE
+.idea/
+!.idea/icon.png
+*.iml
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Logs & temp
+*.log
+*.hprof
+.kotlin/

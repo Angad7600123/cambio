@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Widget metadata. The minimum size is chosen so the full 5x4 keypad and the
+  display always fit; below this the widget would clip rather than degrade.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_description"
+    android:initialLayout="@layout/widget_loading"
+    android:minWidth="250dp"
+    android:minHeight="290dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="5"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="3600000"
+    android:previewLayout="@layout/widget_loading"
+    android:widgetCategory="home_screen" />

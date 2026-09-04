@@ -1,2 +1,19 @@
-# Auto detect text files and perform LF normalization
+# Normalise text files to LF in the repository.
 * text=auto
+
+# The Gradle wrapper script is executed by /bin/sh on Linux and macOS (including
+# CI). It must keep LF endings; CRLF here produces "bad interpreter" failures.
+gradlew text eol=lf
+*.sh text eol=lf
+
+# Windows-only scripts keep CRLF.
+gradlew.bat text eol=crlf
+*.bat text eol=crlf
+
+# Never munge binaries.
+*.jar binary
+*.png binary
+*.jpg binary
+*.webp binary
+*.keystore binary
+*.jks binary

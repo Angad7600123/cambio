@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Widget colours that must exist as Android resources.
+
+  A RemoteViews background has to be a drawable, and the widget's loading layout
+  is plain XML, so those colours live here. Everything else the widget draws uses
+  day/night ColorProviders declared in CambioWidget.kt alongside the app palette.
+
+  The matching values-night file supplies the dark variant, which is what makes
+  the widget follow the system theme with no code involved.
+
+  These values mirror ui/theme/Color.kt. Light values here; dark in values-night.
+-->
+<resources>
+    <color name="widget_canvas">#FFFFFFFF</color>
+    <color name="widget_key">#FFEAEAEF</color>
+    <color name="widget_accent">#FF0F6E56</color>
+    <color name="widget_text_primary">#FF000000</color>
+    <color name="widget_text_secondary">#FF6C6C70</color>
+</resources>

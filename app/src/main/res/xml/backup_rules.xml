@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Settings and history are backed up; the cached rate table is not, since it is
+  disposable and would be stale on restore anyway.
+-->
+<full-backup-content>
+    <include domain="file" path="datastore/" />
+</full-backup-content>

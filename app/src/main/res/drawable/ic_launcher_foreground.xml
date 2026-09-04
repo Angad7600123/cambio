@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Launcher icon foreground: a currency-exchange mark drawn as a vector so the app
+  ships no binary image assets.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Upper arrow, pointing right -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M34,44 L66,44 L66,38 L78,48 L66,58 L66,52 L34,52 Z" />
+    <!-- Lower arrow, pointing left -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M74,64 L42,64 L42,58 L30,68 L42,78 L42,72 L74,72 Z" />
+</vector>

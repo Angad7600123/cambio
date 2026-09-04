@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  All user-facing text lives here, so translating the app is a matter of adding a
+  values-<locale>/strings.xml. The app ships English only; no machine-translated
+  locales are included.
+-->
+<resources>
+    <string name="app_name">Cambio</string>
+    <string name="widget_description">Calculator with live currency conversion</string>
+
+    <!-- Keypad. These are spoken by TalkBack, so they are words rather than glyphs. -->
+    <string name="key_0">Zero</string>
+    <string name="key_1">One</string>
+    <string name="key_2">Two</string>
+    <string name="key_3">Three</string>
+    <string name="key_4">Four</string>
+    <string name="key_5">Five</string>
+    <string name="key_6">Six</string>
+    <string name="key_7">Seven</string>
+    <string name="key_8">Eight</string>
+    <string name="key_9">Nine</string>
+    <string name="key_add">Plus</string>
+    <string name="key_subtract">Minus</string>
+    <string name="key_multiply">Multiply</string>
+    <string name="key_divide">Divide</string>
+    <string name="key_decimal">Decimal point</string>
+    <string name="key_percent">Percent</string>
+    <string name="key_parenthesis">Parenthesis</string>
+    <string name="key_clear">Clear</string>
+    <string name="key_backspace">Backspace</string>
+    <string name="key_equals">Equals</string>
+
+    <!-- Calculator errors -->
+    <string name="calc_error_empty">Nothing to calculate</string>
+    <string name="calc_error_malformed">Invalid expression</string>
+    <string name="calc_error_divide_by_zero">Cannot divide by zero</string>
+    <string name="calc_error_overflow">Number too large</string>
+    <string name="calc_error_short">Error</string>
+
+    <!-- Rates -->
+    <string name="rates_loading">Loading exchange rates</string>
+    <string name="rates_updating">Updating…</string>
+    <string name="rates_stale">Rates may be out of date</string>
+    <string name="error_network">You appear to be offline</string>
+    <string name="error_http">Rate service returned error %1$d</string>
+    <string name="error_malformed">Unexpected response from rate service</string>
+    <string name="error_provider">Rate service reported a problem</string>
+    <string name="action_retry">Retry</string>
+
+    <!-- Currency picker -->
+    <string name="currency_picker_title">Choose currency</string>
+    <string name="currency_search_hint">Search code or name</string>
+    <string name="currency_section_recent">Recent</string>
+    <string name="currency_section_all">All currencies</string>
+    <string name="currency_no_results">No currency matches “%1$s”</string>
+    <string name="currency_picker_unavailable">Currencies will appear once exchange rates have loaded.</string>
+
+    <!-- History -->
+    <string name="history_title">History</string>
+    <string name="history_empty">Calculations you complete will appear here.</string>
+    <string name="action_clear_history">Clear</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_about">About</string>
+    <string name="theme_system">Follow system</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="settings_system_colors">Use system colours</string>
+    <string name="settings_system_colors_subtitle">Match your wallpaper or device theme</string>
+    <string name="settings_privacy_note">Cambio collects no data and contains no analytics. The only network request it makes is for exchange rates.</string>
+
+    <!-- Attribution required by the rate provider's terms of use. -->
+    <string name="attribution_title">Exchange rates</string>
+    <string name="attribution_subtitle">Rates by ExchangeRate-API</string>
+
+    <!-- Content descriptions -->
+    <string name="cd_open_history">Open history</string>
+    <string name="cd_open_settings">Open settings</string>
+    <string name="cd_swap_currencies">Swap currencies</string>
+    <string name="cd_select_from_currency">Convert from %1$s, %2$s. Tap to change.</string>
+    <string name="cd_select_to_currency">Convert to %1$s, %2$s. Tap to change.</string>
+    <string name="cd_converted_amount">%1$s %2$s</string>
+    <string name="cd_refresh_rates">%1$s. Tap to refresh rates.</string>
+    <string name="cd_retry_rates">%1$s. Tap to retry.</string>
+    <string name="cd_currency_row">%1$s, %2$s</string>
+    <string name="cd_currency_row_selected">%1$s, %2$s, selected</string>
+</resources>
