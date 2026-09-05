@@ -35,6 +35,7 @@ import io.github.angad7600123.cambio.calculator.CalcError
 import io.github.angad7600123.cambio.calculator.CalculatorKey
 import io.github.angad7600123.cambio.data.HistoryEntry
 import io.github.angad7600123.cambio.data.ThemeMode
+import io.github.angad7600123.cambio.ui.components.CalcToast
 import io.github.angad7600123.cambio.ui.components.CalculatorDisplay
 import io.github.angad7600123.cambio.ui.components.ConvertedAmount
 import io.github.angad7600123.cambio.ui.components.CurrencyBar
@@ -80,6 +81,7 @@ fun CalculatorScreen(
     onClearHistory: () -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
     onUseSystemColorsChange: (Boolean) -> Unit,
+    onTransientErrorShown: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = CambioTheme.colors
@@ -112,6 +114,14 @@ fun CalculatorScreen(
                 )
             }
         }
+
+        CalcToast(
+            message = state.transientError?.let { stringResource(it.messageRes()) },
+            onDismiss = onTransientErrorShown,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = TOAST_BOTTOM_INSET),
+        )
     }
 
     if (activeSheet != ActiveSheet.None) {
@@ -203,7 +213,7 @@ private fun TallLayout(
 
         Keypad(
             onKeyPress = onKeyPress,
-            modifier = Modifier.padding(bottom = SCREEN_PADDING),
+            modifier = Modifier.padding(bottom = KEYPAD_BOTTOM_MARGIN),
         )
     }
 }
@@ -301,9 +311,9 @@ private fun DisplaySection(
         horizontalAlignment = Alignment.End,
     ) {
         CalculatorDisplay(
-            expression = state.expressionDisplay,
-            result = state.resultDisplay,
-            errorMessage = state.calcError?.let { stringResource(it.messageRes()) },
+            primary = state.primaryDisplay,
+            secondary = state.secondaryDisplay,
+            isEditing = state.isEditing,
             modifier = Modifier.weight(1f, fill = false),
         )
 
@@ -360,8 +370,10 @@ private fun CalcError.messageRes(): Int = when (this) {
     CalcError.OVERFLOW -> R.string.calc_error_overflow
 }
 
-private val SCREEN_PADDING = 20.dp
+private val SCREEN_PADDING = 24.dp
 private val TOP_BAR_HEIGHT = 56.dp
-private val KEYPAD_TOP_GAP = 16.dp
+private val KEYPAD_TOP_GAP = 20.dp
+private val KEYPAD_BOTTOM_MARGIN = 13.dp
+private val TOAST_BOTTOM_INSET = 140.dp
 private val KEYPAD_MAX_WIDTH = 420.dp
 private val WIDE_LAYOUT_MIN_WIDTH = 600.dp

@@ -49,7 +49,8 @@ private data class KeySpec(
 fun Keypad(
     onKeyPress: (CalculatorKey) -> Unit,
     modifier: Modifier = Modifier,
-    spacing: Dp = DEFAULT_SPACING,
+    horizontalSpacing: Dp = KEY_GAP_HORIZONTAL,
+    verticalSpacing: Dp = KEY_GAP_VERTICAL,
     numberFormatter: NumberDisplayFormatter = remember { NumberDisplayFormatter() },
 ) {
     val decimalSeparator = remember(numberFormatter) {
@@ -60,12 +61,12 @@ fun Keypad(
 
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(spacing),
+        verticalArrangement = Arrangement.spacedBy(verticalSpacing),
     ) {
         rows.forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(spacing),
+                horizontalArrangement = Arrangement.spacedBy(horizontalSpacing),
             ) {
                 row.forEach { spec ->
                     CalcButton(
@@ -89,7 +90,7 @@ private fun keypadRows(decimalSeparator: String): List<List<KeySpec>> = listOf(
         KeySpec(
             ExpressionFormatter.DIVIDE_GLYPH,
             R.string.key_divide,
-            KeyStyle.Standard,
+            KeyStyle.Operator,
             CalculatorKey.Operator(OperatorType.DIVIDE),
         ),
     ),
@@ -100,7 +101,7 @@ private fun keypadRows(decimalSeparator: String): List<List<KeySpec>> = listOf(
         KeySpec(
             ExpressionFormatter.MULTIPLY_GLYPH,
             R.string.key_multiply,
-            KeyStyle.Standard,
+            KeyStyle.Operator,
             CalculatorKey.Operator(OperatorType.MULTIPLY),
         ),
     ),
@@ -111,7 +112,7 @@ private fun keypadRows(decimalSeparator: String): List<List<KeySpec>> = listOf(
         KeySpec(
             ExpressionFormatter.MINUS_GLYPH,
             R.string.key_subtract,
-            KeyStyle.Standard,
+            KeyStyle.Operator,
             CalculatorKey.Operator(OperatorType.SUBTRACT),
         ),
     ),
@@ -122,7 +123,7 @@ private fun keypadRows(decimalSeparator: String): List<List<KeySpec>> = listOf(
         KeySpec(
             ExpressionFormatter.PLUS_GLYPH,
             R.string.key_add,
-            KeyStyle.Standard,
+            KeyStyle.Operator,
             CalculatorKey.Operator(OperatorType.ADD),
         ),
     ),
@@ -154,4 +155,9 @@ private val DIGIT_DESCRIPTIONS = intArrayOf(
     R.string.key_9,
 )
 
-private val DEFAULT_SPACING = 12.dp
+/**
+ * Gutters measured from One UI: 17.5dp horizontally, 15dp vertically. The wider
+ * horizontal gutter is what stops the four columns reading as a solid slab.
+ */
+private val KEY_GAP_HORIZONTAL = 17.5.dp
+private val KEY_GAP_VERTICAL = 15.dp

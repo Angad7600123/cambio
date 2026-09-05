@@ -3,12 +3,15 @@ package io.github.angad7600123.cambio.widget
 import android.content.Context
 import android.content.res.Configuration
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.Preferences
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
 import androidx.glance.ImageProvider
+import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
@@ -24,8 +27,10 @@ import androidx.glance.layout.RowScope
 import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
+import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
+import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
@@ -143,13 +148,16 @@ private fun WidgetBody(
     isError: Boolean,
     palette: WidgetPalette,
 ) {
+    val metrics = WidgetMetrics.forSize(LocalSize.current)
+
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
             .background(ImageProvider(R.drawable.widget_background))
-            .padding(12.dp),
+            .padding(metrics.padding),
     ) {
         WidgetDisplay(
+            modifier = GlanceModifier.defaultWeight(),
             expressionText = expressionText,
             resultText = resultText,
             convertedText = convertedText,
@@ -157,15 +165,18 @@ private fun WidgetBody(
             toCode = toCode,
             isError = isError,
             palette = palette,
+            metrics = metrics,
         )
-        // The keypad takes all the space the display does not, so the widget never
-        // leaves a dead band at the bottom.
-        WidgetKeypad(palette, GlanceModifier.defaultWeight())
+        // The keypad is given its exact height rather than a weight. Stretching it
+        // made each row shorter than the key it holds, which clipped the circles
+        // into octagons; sizing it means the keys stay perfectly round.
+        WidgetKeypad(palette, metrics, GlanceModifier.height(metrics.keypadHeight))
     }
 }
 
 @Composable
 private fun WidgetDisplay(
+    modifier: GlanceModifier = GlanceModifier,
     expressionText: String,
     resultText: String,
     convertedText: String?,
@@ -173,19 +184,21 @@ private fun WidgetDisplay(
     toCode: String,
     isError: Boolean,
     palette: WidgetPalette,
+    metrics: WidgetMetrics,
 ) {
     Column(
-        modifier = GlanceModifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 6.dp, vertical = 4.dp),
+            .padding(horizontal = metrics.padding),
         horizontalAlignment = Alignment.End,
+        verticalAlignment = Alignment.Bottom,
     ) {
         Text(
             text = expressionText.ifEmpty { " " },
             maxLines = 1,
             style = TextStyle(
                 color = palette.textSecondary,
-                fontSize = 13.sp(),
+                fontSize = metrics.expressionSp.sp(),
                 textAlign = TextAlign.End,
             ),
         )
@@ -194,7 +207,7 @@ private fun WidgetDisplay(
             maxLines = 1,
             style = TextStyle(
                 color = if (isError) palette.destructive else palette.textPrimary,
-                fontSize = 30.sp(),
+                fontSize = metrics.resultSp.sp(),
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.End,
             ),
@@ -204,7 +217,7 @@ private fun WidgetDisplay(
             maxLines = 1,
             style = TextStyle(
                 color = palette.accentText,
-                fontSize = 15.sp(),
+                fontSize = metrics.convertedSp.sp(),
                 textAlign = TextAlign.End,
             ),
         )
@@ -219,17 +232,18 @@ private fun WidgetDisplay(
  * inside the child composable.
  */
 @Composable
-private fun WidgetKeypad(palette: WidgetPalette, modifier: GlanceModifier = GlanceModifier) {
+private fun WidgetKeypad(palette: WidgetPalette, metrics: WidgetMetrics, modifier: GlanceModifier = GlanceModifier) {
     Column(modifier = modifier.fillMaxWidth()) {
         WIDGET_KEY_ROWS.forEach { row ->
-            WidgetRow(modifier = GlanceModifier.defaultWeight()) {
+            WidgetRow(modifier = GlanceModifier.height(metrics.rowHeight)) {
                 row.forEach { spec ->
                     WidgetKey(
                         label = spec.label,
                         style = spec.style,
                         action = spec.action,
                         palette = palette,
-                        modifier = GlanceModifier.defaultWeight(),
+                        metrics = metrics,
+                        modifier = GlanceModifier.width(metrics.columnWidth),
                     )
                 }
             }
@@ -245,25 +259,25 @@ private val WIDGET_KEY_ROWS: List<List<WidgetKeySpec>> = listOf(
         WidgetKeySpec("C", WidgetKeyStyle.Destructive, WidgetAction.CLEAR),
         WidgetKeySpec("⌫", WidgetKeyStyle.Destructive, WidgetAction.BACKSPACE),
         WidgetKeySpec("%", WidgetKeyStyle.Standard, WidgetAction.PERCENT),
-        WidgetKeySpec("÷", WidgetKeyStyle.Standard, WidgetAction.DIVIDE),
+        WidgetKeySpec("÷", WidgetKeyStyle.Operator, WidgetAction.DIVIDE),
     ),
     listOf(
         WidgetKeySpec("7", WidgetKeyStyle.Standard, WidgetAction.DIGIT_7),
         WidgetKeySpec("8", WidgetKeyStyle.Standard, WidgetAction.DIGIT_8),
         WidgetKeySpec("9", WidgetKeyStyle.Standard, WidgetAction.DIGIT_9),
-        WidgetKeySpec("×", WidgetKeyStyle.Standard, WidgetAction.MULTIPLY),
+        WidgetKeySpec("×", WidgetKeyStyle.Operator, WidgetAction.MULTIPLY),
     ),
     listOf(
         WidgetKeySpec("4", WidgetKeyStyle.Standard, WidgetAction.DIGIT_4),
         WidgetKeySpec("5", WidgetKeyStyle.Standard, WidgetAction.DIGIT_5),
         WidgetKeySpec("6", WidgetKeyStyle.Standard, WidgetAction.DIGIT_6),
-        WidgetKeySpec("−", WidgetKeyStyle.Standard, WidgetAction.SUBTRACT),
+        WidgetKeySpec("−", WidgetKeyStyle.Operator, WidgetAction.SUBTRACT),
     ),
     listOf(
         WidgetKeySpec("1", WidgetKeyStyle.Standard, WidgetAction.DIGIT_1),
         WidgetKeySpec("2", WidgetKeyStyle.Standard, WidgetAction.DIGIT_2),
         WidgetKeySpec("3", WidgetKeyStyle.Standard, WidgetAction.DIGIT_3),
-        WidgetKeySpec("+", WidgetKeyStyle.Standard, WidgetAction.ADD),
+        WidgetKeySpec("+", WidgetKeyStyle.Operator, WidgetAction.ADD),
     ),
     listOf(
         WidgetKeySpec("( )", WidgetKeyStyle.Standard, WidgetAction.PAREN),
@@ -276,9 +290,7 @@ private val WIDGET_KEY_ROWS: List<List<WidgetKeySpec>> = listOf(
 @Composable
 private fun WidgetRow(modifier: GlanceModifier = GlanceModifier, content: @Composable RowScope.() -> Unit) {
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp),
+        modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalAlignment = Alignment.CenterVertically,
         content = content,
@@ -287,12 +299,15 @@ private fun WidgetRow(modifier: GlanceModifier = GlanceModifier, content: @Compo
 
 private enum class WidgetKeyStyle(val backgroundRes: Int) {
     Standard(R.drawable.widget_key),
+
+    /** The operator column, a shade lighter, exactly as in the app. */
+    Operator(R.drawable.widget_key_operator),
     Destructive(R.drawable.widget_key),
     Accent(R.drawable.widget_key_accent),
     ;
 
     fun textColor(palette: WidgetPalette): ColorProvider = when (this) {
-        Standard -> palette.textPrimary
+        Standard, Operator -> palette.textPrimary
         Destructive -> palette.destructive
         Accent -> palette.onAccent
     }
@@ -308,8 +323,89 @@ private enum class WidgetKeyStyle(val backgroundRes: Int) {
  * Key and canvas *backgrounds* still come from drawable resources (with `-night`
  * variants), because a RemoteViews background must be a drawable.
  */
-/** Fixed key diameter; keeps keys circular at every widget size. */
-private val KEY_DIAMETER = 46.dp
+/**
+ * Sizes derived from the widget's actual dimensions.
+ *
+ * A fixed key size left wide empty gutters on a large widget and a cramped
+ * display, so everything is proportional instead: the keys grow to fill the width
+ * the way the iOS calculator's do, and the type scales with them.
+ *
+ * The width budget is `4d + 3g + 2p`, with the gap and padding expressed as
+ * fractions of the diameter, which reduces to `d = width / 4.76`. Height is
+ * checked too, so a short-but-wide widget shrinks its keys rather than clipping a
+ * row.
+ */
+private data class WidgetMetrics(
+    val keyDiameter: Dp,
+    val keyGap: Dp,
+    val padding: Dp,
+    /** Exact height of the five rows, so the keypad is sized rather than stretched. */
+    val keypadHeight: Dp,
+    val rowHeight: Dp,
+    /** Width of one grid cell: the key plus its gutter. */
+    val columnWidth: Dp,
+    val resultSp: Float,
+    val convertedSp: Float,
+    val expressionSp: Float,
+    val keyGlyphSp: Float,
+) {
+    companion object {
+        private const val GAP_RATIO = 0.16f
+        private const val PADDING_RATIO = 0.14f
+
+        /** Widest a cell may get relative to its key, before it looks disconnected. */
+        private const val MAX_CELL_RATIO = 1.42f
+        private const val COLUMNS = 4
+        private const val ROWS = 5
+
+        /**
+         * Share of the widget height reserved for the display.
+         *
+         * Sized to fit all three lines at the ratios below; drop it much lower and
+         * the converted amount is the first thing to be clipped.
+         */
+        private const val DISPLAY_SHARE = 0.26f
+
+        private val MIN_DIAMETER = 40.dp
+        private val MAX_DIAMETER = 88.dp
+
+        fun forSize(size: DpSize): WidgetMetrics {
+            val widthBudget = COLUMNS + (COLUMNS - 1) * GAP_RATIO + 2 * PADDING_RATIO
+            val byWidth = size.width.value / widthBudget
+
+            // Each row occupies the key plus one gap, so the five rows need
+            // 5 * (1 + GAP_RATIO) diameters of height.
+            val heightBudget = ROWS * (1f + GAP_RATIO)
+            val byHeight = (size.height.value * (1f - DISPLAY_SHARE)) / heightBudget
+
+            val diameter = minOf(byWidth, byHeight)
+                .coerceIn(MIN_DIAMETER.value, MAX_DIAMETER.value)
+            val rowHeight = diameter * (1f + GAP_RATIO)
+
+            // When height limits the key size there is width to spare. Let the
+            // cells absorb some of it rather than leaving one wide margin, but cap
+            // how far apart they drift so the grid still reads as a keypad.
+            val padding = diameter * PADDING_RATIO
+            val availableCell = (size.width.value - 2 * padding) / COLUMNS
+            val columnWidth = minOf(availableCell, diameter * MAX_CELL_RATIO)
+
+            return WidgetMetrics(
+                keyDiameter = diameter.dp,
+                keyGap = (diameter * GAP_RATIO).dp,
+                padding = padding.dp,
+                keypadHeight = (rowHeight * ROWS).dp,
+                rowHeight = rowHeight.dp,
+                columnWidth = columnWidth.dp,
+                // Tied to the key size so the display is never lost above a large
+                // keypad, nor overpowering on a small one.
+                resultSp = diameter * 0.62f,
+                convertedSp = diameter * 0.30f,
+                expressionSp = diameter * 0.22f,
+                keyGlyphSp = diameter * 0.42f,
+            )
+        }
+    }
+}
 
 /**
  * The widget's resolved colours for the current light/dark configuration.
@@ -364,6 +460,7 @@ private fun WidgetKey(
     style: WidgetKeyStyle,
     action: WidgetAction,
     palette: WidgetPalette,
+    metrics: WidgetMetrics,
     modifier: GlanceModifier = GlanceModifier,
 ) {
     Box(
@@ -372,7 +469,7 @@ private fun WidgetKey(
     ) {
         Box(
             modifier = GlanceModifier
-                .size(KEY_DIAMETER)
+                .size(metrics.keyDiameter)
                 .background(ImageProvider(style.backgroundRes))
                 .clickable(
                     actionRunCallback<WidgetKeyActionCallback>(
@@ -385,7 +482,7 @@ private fun WidgetKey(
                 text = label,
                 style = TextStyle(
                     color = style.textColor(palette),
-                    fontSize = 17.sp(),
+                    fontSize = metrics.keyGlyphSp.sp(),
                     textAlign = TextAlign.Center,
                 ),
             )
@@ -394,7 +491,7 @@ private fun WidgetKey(
 }
 
 /** Glance text sizes are expressed in sp via the Compose unit type. */
-private fun Int.sp() = androidx.compose.ui.unit.TextUnit(
-    this.toFloat(),
+private fun Float.sp() = androidx.compose.ui.unit.TextUnit(
+    this,
     androidx.compose.ui.unit.TextUnitType.Sp,
 )

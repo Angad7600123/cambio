@@ -38,9 +38,20 @@ sealed interface RatesStatus {
  */
 @Immutable
 data class CalculatorUiState(
-    val expressionDisplay: String = "",
-    val resultDisplay: String = "0",
-    val calcError: CalcError? = null,
+    /** The large line: the expression while typing, the result after equals. */
+    val primaryDisplay: String = "0",
+    /** The small line beneath it: the running preview, or the evaluated expression. */
+    val secondaryDisplay: String = "",
+    /**
+     * True while an expression is being typed, so the primary line shows the caret
+     * and tints its operators. False once equals has produced a result.
+     */
+    val isEditing: Boolean = true,
+    /**
+     * A transient failure to surface as a toast. One UI does not blank the display
+     * on a bad expression, it floats a brief message and leaves the input intact.
+     */
+    val transientError: CalcError? = null,
     val fromCurrency: CurrencyInfo,
     val toCurrency: CurrencyInfo,
     val convertedDisplay: String? = null,
@@ -55,5 +66,5 @@ data class CalculatorUiState(
     val useSystemColors: Boolean = false,
 ) {
     /** True when there is a value worth copying or converting. */
-    val hasValue: Boolean get() = calcError == null && resultDisplay.isNotEmpty()
+    val hasValue: Boolean get() = primaryDisplay.isNotEmpty()
 }

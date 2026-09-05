@@ -1,15 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Widget metadata. The minimum size is chosen so the full 5x4 keypad and the
-  display always fit; below this the widget would clip rather than degrade.
+  Widget metadata.
+
+  The default is six cells tall rather than five. The keypad is five rows of
+  circles, so at 4x5 the key size ends up limited by height and the columns are
+  left with wide gutters; the extra row of height lets the keys grow to fill the
+  width instead. The layout is proportional, so any resize still works.
 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/widget_description"
     android:initialLayout="@layout/widget_loading"
     android:minWidth="250dp"
-    android:minHeight="290dp"
+    android:minHeight="330dp"
     android:targetCellWidth="4"
-    android:targetCellHeight="5"
+    android:targetCellHeight="6"
     android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="3600000"
     android:previewLayout="@layout/widget_loading"

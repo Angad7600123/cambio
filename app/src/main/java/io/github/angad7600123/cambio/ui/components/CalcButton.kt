@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -39,13 +38,16 @@ import io.github.angad7600123.cambio.ui.theme.CambioTheme
 /**
  * The visual role a key plays.
  *
- * Hierarchy is carried by glyph colour and a single filled key, exactly as in the
- * reference design — not by colouring whole rows, which would flatten the meaning
- * of the accent.
+ * Three tiers, matching One UI: digits and utilities sit on the darkest surface,
+ * the operator column one step lighter so it reads as its own group, and equals
+ * as the single filled key.
  */
 enum class KeyStyle {
-    /** Digits, operators, decimal point, parentheses: white glyph on a graphite key. */
+    /** Digits, decimal point and parentheses: white glyph on the darkest key. */
     Standard,
+
+    /** The operator column. Same glyph colour, one step lighter background. */
+    Operator,
 
     /** Clear and backspace: coral glyph, marking the two destructive actions. */
     Destructive,
@@ -57,10 +59,13 @@ enum class KeyStyle {
 /**
  * A single circular calculator key.
  *
- * Press feedback is deliberate: a subtle scale-down plus a background lift, both
- * spring-driven so rapid presses interrupt and re-target smoothly rather than
- * queueing up. A physical keyboard-tap haptic fires on press, respecting the
- * user's system haptics setting.
+ * Press feedback deliberately mirrors One UI rather than stock Material: a soft
+ * glow blooms *outside* the circle in the key's own content colour, together with
+ * a slight scale-down. Material's default ripple is clipped to the shape and is
+ * far too subdued to read on a true-black canvas.
+ *
+ * Both animations are spring/tween driven and interruptible, so rapid presses
+ * re-target smoothly instead of queueing.
  *
  * @param label the glyph to render.
  * @param contentDescription spoken label for TalkBack — "divide" rather than the
@@ -79,19 +84,32 @@ fun CalcButton(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
-    val targetBackground = when (style) {
-        KeyStyle.Accent -> if (isPressed) colors.accentPressed else colors.accent
-        else -> if (isPressed) colors.keyPressed else colors.key
+    val restingBackground = when (style) {
+        KeyStyle.Accent -> colors.accent
+        KeyStyle.Operator -> colors.operatorKey
+        else -> colors.key
+    }
+    val pressedBackground = when (style) {
+        KeyStyle.Accent -> colors.accentPressed
+        KeyStyle.Operator -> colors.operatorKeyPressed
+        else -> colors.keyPressed
     }
 
     val contentColor = when (style) {
-        KeyStyle.Standard -> colors.onKey
+        KeyStyle.Standard, KeyStyle.Operator -> colors.onKey
         KeyStyle.Destructive -> colors.destructive
         KeyStyle.Accent -> colors.onAccent
     }
 
+    /** The halo takes the glyph's colour, so the destructive keys bloom coral. */
+    val glowColor = when (style) {
+        KeyStyle.Accent -> colors.accent
+        KeyStyle.Destructive -> colors.destructive
+        else -> Color.White
+    }
+
     val background by animateColorAsState(
-        targetValue = targetBackground,
+        targetValue = if (isPressed) pressedBackground else restingBackground,
         animationSpec = tween(durationMillis = PRESS_COLOR_MILLIS),
         label = "keyBackground",
     )
@@ -112,19 +130,22 @@ fun CalcButton(
             // where the grid would otherwise shrink the key below 48dp.
             .sizeIn(minWidth = MIN_TOUCH_TARGET, minHeight = MIN_TOUCH_TARGET)
             .scale(scale)
-            .clip(CircleShape)
-            .background(background)
             .semantics {
                 this.contentDescription = contentDescription
                 onClick(label = contentDescription, action = null)
             }
-            .keyClickable(
+            .clickable(
                 interactionSource = interactionSource,
-                contentColor = contentColor,
+                // The glow is drawn by the indication itself, unclipped, so it can
+                // spill past the circle the way One UI's does.
+                indication = KeyGlow(glowColor),
+                role = Role.Button,
             ) {
                 view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                 onClick()
-            },
+            }
+            .clip(CircleShape)
+            .background(background),
         contentAlignment = Alignment.Center,
     ) {
         CompositionLocalProvider(LocalContentColor provides contentColor) {
@@ -137,19 +158,6 @@ fun CalcButton(
         }
     }
 }
-
-/** Clickable with a ripple tinted to the key's own content colour. */
-@Composable
-private fun Modifier.keyClickable(
-    interactionSource: MutableInteractionSource,
-    contentColor: Color,
-    onClick: () -> Unit,
-): Modifier = this.clickable(
-    interactionSource = interactionSource,
-    indication = ripple(bounded = true, color = contentColor),
-    role = Role.Button,
-    onClick = onClick,
-)
 
 private const val PRESSED_SCALE = 0.93f
 private const val PRESS_COLOR_MILLIS = 90

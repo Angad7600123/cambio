@@ -2,6 +2,7 @@ package io.github.angad7600123.cambio.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.angad7600123.cambio.calculator.CalcError
 import io.github.angad7600123.cambio.calculator.CalcResult
 import io.github.angad7600123.cambio.calculator.CalculatorEngine
 import io.github.angad7600123.cambio.calculator.CalculatorInput
@@ -54,13 +55,22 @@ class CalculatorViewModel(
     /** The expression that produced the currently displayed result, shown after `=`. */
     private val evaluatedExpression = MutableStateFlow<String?>(null)
 
+    /**
+     * A failure to surface as a toast.
+     *
+     * One UI leaves a bad expression on screen and floats a brief message rather
+     * than blanking the display, so this is deliberately *not* part of the input
+     * state — the typed expression survives untouched.
+     */
+    private val transientError = MutableStateFlow<CalcError?>(null)
+
     val uiState: StateFlow<CalculatorUiState> = combine(
-        inputState,
-        evaluatedExpression,
+        combine(inputState, evaluatedExpression, transientError, ::Triple),
         settingsRepository.settings,
         ratesRepository.snapshot,
-        combine(ratesRepository.refreshState, historyRepository.history, ::Pair),
-    ) { input, evaluated, settings, snapshot, (refreshState, history) ->
+        ratesRepository.refreshState,
+        historyRepository.history,
+    ) { (input, evaluated, _), settings, snapshot, refreshState, history ->
         buildUiState(input, evaluated, settings, snapshot, refreshState, history)
     }.stateIn(
         scope = viewModelScope,
@@ -82,6 +92,8 @@ class CalculatorViewModel(
             return
         }
 
+        transientError.value = null
+
         // Any other key leaves the "showing a finished result" mode.
         if (before.justEvaluated || before.error != null) {
             evaluatedExpression.value = null
@@ -91,14 +103,25 @@ class CalculatorViewModel(
 
     private fun onEquals(before: InputState) {
         val after = CalculatorInput.press(before, CalculatorKey.Equals)
-        inputState.value = after
 
-        if (after.justEvaluated && after.error == null) {
+        if (after.error != null) {
+            // Keep exactly what the user typed; only float a message about it.
+            transientError.value = after.error
+            return
+        }
+
+        inputState.value = after
+        if (after.justEvaluated) {
             evaluatedExpression.value = before.expression
             recordHistory(before.expression, after.expression)
         } else {
             evaluatedExpression.value = null
         }
+    }
+
+    /** Called once the toast has been shown for its duration. */
+    fun onTransientErrorShown() {
+        transientError.value = null
     }
 
     fun onSwapCurrencies() {
@@ -185,23 +208,35 @@ class CalculatorViewModel(
         val to = catalog.infoFor(settings.toCurrency)
         val value = currentValue(input)
 
-        val resultDisplay = when {
-            input.error != null -> ""
-            value != null -> numberFormatter.format(value)
-            else -> ZERO_DISPLAY
-        }
+        val resultDisplay = value?.let(numberFormatter::format) ?: ZERO_DISPLAY
+        val expressionDisplay = expressionFormatter.format(input.expression)
 
-        // After `=` the top line shows the expression that produced the result;
-        // while typing it shows what is being typed.
-        val expressionDisplay = when {
-            evaluated != null -> expressionFormatter.format(evaluated) + EQUALS_SUFFIX
-            else -> expressionFormatter.formatSecondary(input.expression, resultDisplay)
+        // The two lines swap roles around equals, the way One UI does it. While
+        // typing, the expression is the hero and the running total sits underneath;
+        // once evaluated, the result takes over and the expression shrinks above it.
+        val isEditing = evaluated == null
+        val primary: String
+        val secondary: String
+
+        if (isEditing) {
+            primary = expressionDisplay.ifEmpty { ZERO_DISPLAY }
+            // Suppress the preview while a bare number is being typed, where it
+            // would merely repeat the line above.
+            secondary = if (expressionDisplay.isEmpty() || resultDisplay == expressionDisplay) {
+                ""
+            } else {
+                resultDisplay
+            }
+        } else {
+            primary = resultDisplay
+            secondary = expressionFormatter.format(evaluated) + EQUALS_SUFFIX
         }
 
         return CalculatorUiState(
-            expressionDisplay = expressionDisplay,
-            resultDisplay = resultDisplay,
-            calcError = input.error,
+            primaryDisplay = primary,
+            secondaryDisplay = secondary,
+            isEditing = isEditing,
+            transientError = transientError.value,
             fromCurrency = from,
             toCurrency = to,
             convertedDisplay = convertedDisplay(value, settings, snapshot, to),

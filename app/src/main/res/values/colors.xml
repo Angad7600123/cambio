@@ -13,7 +13,8 @@
 -->
 <resources>
     <color name="widget_canvas">#FFFFFFFF</color>
-    <color name="widget_key">#FFEAEAEF</color>
+    <color name="widget_key">#FFEFEFF3</color>
+    <color name="widget_operator_key">#FFDFDFE6</color>
     <color name="widget_accent">#FF0F6E56</color>
     <color name="widget_text_primary">#FF000000</color>
     <color name="widget_text_secondary">#FF6C6C70</color>

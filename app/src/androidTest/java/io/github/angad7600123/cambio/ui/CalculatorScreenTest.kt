@@ -35,8 +35,9 @@ class CalculatorScreenTest {
     private val inr = CurrencyInfo("INR", "Indian Rupee", "₹", 2, "🇮🇳")
 
     private fun state(
-        expression: String = "",
-        result: String = "0",
+        primary: String = "0",
+        secondary: String = "",
+        isEditing: Boolean = true,
         converted: String? = "945.40",
         rate: String? = "1 USD = 94.5405 INR",
         status: RatesStatus = RatesStatus.Ready(
@@ -45,8 +46,9 @@ class CalculatorScreenTest {
             isRefreshing = false,
         ),
     ) = CalculatorUiState(
-        expressionDisplay = expression,
-        resultDisplay = result,
+        primaryDisplay = primary,
+        secondaryDisplay = secondary,
+        isEditing = isEditing,
         fromCurrency = usd,
         toCurrency = inr,
         convertedDisplay = converted,
@@ -74,6 +76,7 @@ class CalculatorScreenTest {
                     onClearHistory = {},
                     onThemeModeChange = {},
                     onUseSystemColorsChange = {},
+                    onTransientErrorShown = {},
                 )
             }
         }
@@ -129,11 +132,20 @@ class CalculatorScreenTest {
     }
 
     @Test
-    fun displayShowsExpressionAndResult() {
-        setScreen(state(expression = "1,234 × 2", result = "2,468"))
+    fun whileTypingTheExpressionIsTheLargeLineAndThePreviewSitsBelow() {
+        // One UI's hierarchy: the expression leads, the running total follows.
+        setScreen(state(primary = "1,234 × 2", secondary = "2,468", isEditing = true))
 
-        composeRule.onNodeWithText("1,234 × 2").assertIsDisplayed()
+        composeRule.onNodeWithText("1,234 × 2", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("2,468").assertIsDisplayed()
+    }
+
+    @Test
+    fun afterEqualsTheResultBecomesTheLargeLine() {
+        setScreen(state(primary = "2,468", secondary = "1,234 × 2 =", isEditing = false))
+
+        composeRule.onNodeWithText("2,468").assertIsDisplayed()
+        composeRule.onNodeWithText("1,234 × 2 =").assertIsDisplayed()
     }
 
     @Test
@@ -262,13 +274,16 @@ class CalculatorScreenTest {
     }
 
     @Test
-    fun calculatorErrorIsDisplayed() {
+    fun aCalculatorErrorFloatsAToastAndLeavesTheInputAlone() {
+        // One UI keeps the typed expression on screen and floats a brief message,
+        // rather than blanking the display.
         setScreen(
-            state(expression = "5 ÷ 0", result = "").copy(
-                calcError = io.github.angad7600123.cambio.calculator.CalcError.DIVIDE_BY_ZERO,
+            state(primary = "5 ÷ 0", isEditing = true).copy(
+                transientError = io.github.angad7600123.cambio.calculator.CalcError.DIVIDE_BY_ZERO,
             ),
         )
 
         composeRule.onNodeWithText("Cannot divide by zero").assertIsDisplayed()
+        composeRule.onNodeWithText("5 ÷ 0", substring = true).assertIsDisplayed()
     }
 }

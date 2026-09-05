@@ -38,6 +38,10 @@ same engine and the same theme.
 
 *Screenshots captured from the app running on a Pixel 10 Pro XL emulator.*
 
+The interface follows Samsung's One UI calculator closely — key sizes, gutters and
+palette were measured from it rather than approximated — while the currency row,
+converted amount and rate line are Cambio's own.
+
 ## Features
 
 **Calculator**
@@ -48,8 +52,11 @@ same engine and the same theme.
   `200 + 10%` → `220`, `200 × 10%` → `20`, a bare `50%` → `0.5`
 - **Exact decimal arithmetic.** `0.1 + 0.2` is `0.3`, not `0.30000000000000004` —
   everything runs on `BigDecimal`, never binary floating point
-- Chained calculations, backspace, clear, and typed errors
-  ("Cannot divide by zero", not a generic *Error*)
+- Chained calculations, backspace and clear
+- **The expression leads while you type**, with the running total small beneath it;
+  pressing equals swaps them. Operators are tinted and a caret marks your place
+- An incomplete expression floats a brief message and **leaves your input alone**,
+  rather than blanking the display
 - Numbers beyond `Long` range, with scientific notation past `1e16`
 
 **Currency**
@@ -64,7 +71,8 @@ same engine and the same theme.
 
 **App**
 
-- Home-screen widget running the identical calculator and keypad
+- Home-screen widget running the identical calculator and keypad, sized
+  proportionally so the keys and type scale with the widget
 - Light and dark themes, following the system by default, with an optional
   Material You / system-colour mode that picks up your device or OEM theme
 - Calculation history (last 100), tap to restore

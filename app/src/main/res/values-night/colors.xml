@@ -2,8 +2,9 @@
 <!-- Dark variant of the widget palette. See values/colors.xml. -->
 <resources>
     <color name="widget_canvas">#FF000000</color>
-    <color name="widget_key">#FF2C2C2E</color>
-    <color name="widget_accent">#FF17876B</color>
-    <color name="widget_text_primary">#FFFFFFFF</color>
+    <color name="widget_key">#FF171619</color>
+    <color name="widget_operator_key">#FF272727</color>
+    <color name="widget_accent">#FF187D6F</color>
+    <color name="widget_text_primary">#FFFBFBFB</color>
     <color name="widget_text_secondary">#FF8E8E93</color>
 </resources>

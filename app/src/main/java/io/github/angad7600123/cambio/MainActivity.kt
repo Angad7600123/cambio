@@ -51,6 +51,7 @@ class MainActivity : ComponentActivity() {
                     onClearHistory = viewModel::onClearHistory,
                     onThemeModeChange = viewModel::onSetThemeMode,
                     onUseSystemColorsChange = viewModel::onSetUseSystemColors,
+                    onTransientErrorShown = viewModel::onTransientErrorShown,
                 )
             }
         }

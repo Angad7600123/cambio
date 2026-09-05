@@ -22,20 +22,26 @@ internal val CambioTypography = Typography()
 
 /** Styles specific to the calculator surface, kept apart from the Material scale. */
 object CambioTextStyles {
-    /** The main result. Size is adjusted at runtime as the number grows. */
+    /**
+     * The large display line. 45sp matches One UI's calculator; the actual size is
+     * stepped down at runtime as the content grows.
+     */
     val Display = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Light,
-        fontSize = 72.sp,
-        letterSpacing = (-2).sp,
+        fontSize = 45.sp,
+        letterSpacing = (-1).sp,
         lineHeightStyle = LineHeightStyle(
             alignment = LineHeightStyle.Alignment.Center,
             trim = LineHeightStyle.Trim.Both,
         ),
     )
 
-    /** The expression being typed, above the result. */
-    val Expression = TextStyle(
+    /**
+     * The small line under the display: the running preview while typing, or the
+     * expression that produced the result after equals.
+     */
+    val Secondary = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Normal,
         fontSize = 26.sp,
@@ -46,7 +52,7 @@ object CambioTextStyles {
     val Converted = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Normal,
-        fontSize = 34.sp,
+        fontSize = 32.sp,
         letterSpacing = (-1).sp,
     )
 

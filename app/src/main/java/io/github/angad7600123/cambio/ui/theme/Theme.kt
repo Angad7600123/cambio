@@ -30,6 +30,9 @@ data class CambioColors(
     val surface: Color,
     val key: Color,
     val keyPressed: Color,
+    /** The operator column, a step lighter than [key] so it reads as its own group. */
+    val operatorKey: Color,
+    val operatorKeyPressed: Color,
     val onKey: Color,
     val textPrimary: Color,
     val textSecondary: Color,
@@ -37,6 +40,8 @@ data class CambioColors(
     val accent: Color,
     val accentPressed: Color,
     val onAccent: Color,
+    /** Accent tone for glyphs on the canvas: expression operators and the caret. */
+    val accentText: Color,
     val outline: Color,
 )
 
@@ -45,6 +50,8 @@ internal val DarkCambioColors = CambioColors(
     surface = DarkSurface,
     key = DarkKey,
     keyPressed = DarkKeyPressed,
+    operatorKey = DarkOperatorKey,
+    operatorKeyPressed = DarkOperatorKeyPressed,
     onKey = DarkOnKey,
     textPrimary = DarkTextPrimary,
     textSecondary = DarkTextSecondary,
@@ -52,6 +59,7 @@ internal val DarkCambioColors = CambioColors(
     accent = DarkAccent,
     accentPressed = DarkAccentPressed,
     onAccent = DarkOnAccent,
+    accentText = DarkAccentText,
     outline = DarkOutline,
 )
 
@@ -60,6 +68,8 @@ internal val LightCambioColors = CambioColors(
     surface = LightSurface,
     key = LightKey,
     keyPressed = LightKeyPressed,
+    operatorKey = LightOperatorKey,
+    operatorKeyPressed = LightOperatorKeyPressed,
     onKey = LightOnKey,
     textPrimary = LightTextPrimary,
     textSecondary = LightTextSecondary,
@@ -67,6 +77,7 @@ internal val LightCambioColors = CambioColors(
     accent = LightAccent,
     accentPressed = LightAccentPressed,
     onAccent = LightOnAccent,
+    accentText = LightAccent,
     outline = LightOutline,
 )
 
@@ -147,6 +158,8 @@ private fun androidx.compose.material3.ColorScheme.toCambioColors(darkTheme: Boo
     surface = surfaceContainerLow,
     key = surfaceContainerHigh,
     keyPressed = surfaceContainerHighest,
+    operatorKey = surfaceContainerHighest,
+    operatorKeyPressed = surfaceVariant,
     onKey = onSurface,
     textPrimary = onBackground,
     textSecondary = onSurfaceVariant,
@@ -154,6 +167,9 @@ private fun androidx.compose.material3.ColorScheme.toCambioColors(darkTheme: Boo
     accent = primary,
     accentPressed = primaryContainer,
     onAccent = onPrimary,
+    // On a dark canvas the scheme's primary is already the light tone; on a light
+    // canvas it needs the darker container tone to stay legible as text.
+    accentText = if (darkTheme) primary else onPrimaryContainer,
     outline = outlineVariant,
 )
 
