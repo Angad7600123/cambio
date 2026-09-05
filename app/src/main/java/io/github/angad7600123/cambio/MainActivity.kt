@@ -44,6 +44,7 @@ class MainActivity : ComponentActivity() {
                     state = state,
                     onKeyPress = viewModel::onKeyPress,
                     onSwapCurrencies = viewModel::onSwapCurrencies,
+                    onSelectSide = viewModel::onSelectSide,
                     onSelectFromCurrency = viewModel::onSelectFromCurrency,
                     onSelectToCurrency = viewModel::onSelectToCurrency,
                     onRefreshRates = viewModel::onRefreshRates,

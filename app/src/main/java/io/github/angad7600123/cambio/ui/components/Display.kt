@@ -1,6 +1,5 @@
 package io.github.angad7600123.cambio.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -8,25 +7,16 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -35,9 +25,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.angad7600123.cambio.R
 import io.github.angad7600123.cambio.format.ExpressionFormatter
 import io.github.angad7600123.cambio.ui.theme.CambioTextStyles
 import io.github.angad7600123.cambio.ui.theme.CambioTheme
@@ -62,31 +50,8 @@ import io.github.angad7600123.cambio.ui.theme.CambioTheme
  *   caret. False once equals has been pressed.
  */
 @Composable
-fun CalculatorDisplay(primary: String, secondary: String, isEditing: Boolean, modifier: Modifier = Modifier) {
-    val colors = CambioTheme.colors
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.Bottom,
-    ) {
-        PrimaryLine(text = primary, isEditing = isEditing)
-
-        // Kept in the tree even when blank so the primary line does not shift
-        // vertically the moment a preview appears.
-        Text(
-            text = secondary,
-            style = CambioTextStyles.Secondary,
-            color = colors.textSecondary,
-            maxLines = 1,
-            textAlign = TextAlign.End,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 10.dp)
-                .horizontalScroll(rememberScrollState(), reverseScrolling = true)
-                .semantics { liveRegion = LiveRegionMode.Polite },
-        )
-    }
+fun CalculatorDisplay(expression: String, isEditing: Boolean, modifier: Modifier = Modifier) {
+    PrimaryLine(text = expression, isEditing = isEditing, modifier = modifier)
 }
 
 /**
@@ -97,10 +62,12 @@ fun CalculatorDisplay(primary: String, secondary: String, isEditing: Boolean, mo
  * it does not snap between keystrokes.
  */
 @Composable
-private fun PrimaryLine(text: String, isEditing: Boolean) {
+private fun PrimaryLine(text: String, isEditing: Boolean, modifier: Modifier = Modifier) {
     val colors = CambioTheme.colors
 
-    val targetSize = remember(text.length) { fontSizeFor(text.length) }
+    val targetSize = remember(text.length, isEditing) {
+        if (isEditing) fontSizeFor(text.length) else EVALUATED_SIZE
+    }
     val animatedSize by animateFloatAsState(
         targetValue = targetSize.value,
         animationSpec = tween(durationMillis = RESIZE_MILLIS),
@@ -125,22 +92,24 @@ private fun PrimaryLine(text: String, isEditing: Boolean) {
         label = "caretAlpha",
     )
 
-    val styled = remember(text, isEditing, caretAlpha > 0f, colors.accentText, colors.textPrimary) {
-        buildDisplayText(
-            text = text,
-            operatorColor = colors.accentText,
-            caretColor = if (isEditing) colors.accentText.copy(alpha = caretAlpha) else Color.Transparent,
-            showCaret = isEditing,
-        )
-    }
+    val entryScale = rememberEntryScale(text)
+
+    val styled = buildDisplayText(
+        text = text,
+        operatorColor = colors.accentText,
+        caretColor = if (isEditing) colors.accentText.copy(alpha = caretAlpha) else Color.Transparent,
+        showCaret = isEditing,
+        lastCharScale = entryScale,
+        baseFontSize = animatedSize.sp,
+    )
 
     Text(
         text = styled,
         style = CambioTextStyles.Display.copy(fontSize = animatedSize.sp),
-        color = colors.textPrimary,
+        color = if (isEditing) colors.textPrimary else colors.textSecondary,
         maxLines = 1,
         textAlign = TextAlign.End,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState(), reverseScrolling = true)
             .semantics { liveRegion = LiveRegionMode.Polite },
@@ -158,61 +127,32 @@ internal fun buildDisplayText(
     operatorColor: Color,
     caretColor: Color,
     showCaret: Boolean,
+    lastCharScale: Float = 1f,
+    baseFontSize: TextUnit = TextUnit.Unspecified,
 ): AnnotatedString = buildAnnotatedString {
-    text.forEach { char ->
-        if (char in ACCENTED_GLYPHS) {
-            withStyle(SpanStyle(color = operatorColor)) { append(char) }
+    val lastIndex = text.lastIndex
+    // The freshly typed character is scaled through a font-size span. Sizing the
+    // span rather than the whole line is what lets the earlier digits stay put
+    // while only the new one grows.
+    val animateLast = lastCharScale < 1f && baseFontSize != TextUnit.Unspecified
+
+    text.forEachIndexed { index, char ->
+        val color = if (char in ACCENTED_GLYPHS) operatorColor else Color.Unspecified
+        val size = if (animateLast && index == lastIndex) {
+            baseFontSize * lastCharScale
         } else {
+            TextUnit.Unspecified
+        }
+
+        if (color == Color.Unspecified && size == TextUnit.Unspecified) {
             append(char)
+        } else {
+            withStyle(SpanStyle(color = color, fontSize = size)) { append(char) }
         }
     }
+
     if (showCaret) {
         withStyle(SpanStyle(color = caretColor)) { append(CARET) }
-    }
-}
-
-/**
- * The converted amount, shown beneath the currency selectors.
- *
- * Fades rather than popping in, because it depends on the network and would
- * otherwise appear at an arbitrary moment.
- */
-@Composable
-fun ConvertedAmount(amount: String?, currencyCode: String, modifier: Modifier = Modifier) {
-    val colors = CambioTheme.colors
-
-    AnimatedVisibility(
-        visible = amount != null,
-        enter = fadeIn(tween(FADE_MILLIS)),
-        exit = fadeOut(tween(FADE_MILLIS)),
-        modifier = modifier,
-    ) {
-        val shown = amount.orEmpty()
-        val description = stringResource(R.string.cd_converted_amount, shown, currencyCode)
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics {
-                    contentDescription = description
-                    liveRegion = LiveRegionMode.Polite
-                },
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            Text(
-                text = shown,
-                style = CambioTextStyles.Converted,
-                color = colors.accentText,
-                maxLines = 1,
-            )
-            Text(
-                text = " $currencyCode",
-                style = CambioTextStyles.CurrencyCode,
-                color = colors.textSecondary,
-                modifier = Modifier.padding(bottom = 4.dp),
-            )
-        }
     }
 }
 
@@ -235,7 +175,11 @@ private val ACCENTED_GLYPHS = setOf(
     ')',
 )
 
+/** Once evaluated the expression is no longer the hero, so it shrinks. */
+private val EVALUATED_SIZE = 26.sp
+
 private const val CARET = "|"
+
 private const val CARET_PERIOD_MILLIS = 1000
 private const val RESIZE_MILLIS = 140
 private const val FADE_MILLIS = 180

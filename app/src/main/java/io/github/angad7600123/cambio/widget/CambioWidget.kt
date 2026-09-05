@@ -12,6 +12,7 @@ import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
 import androidx.glance.ImageProvider
 import androidx.glance.LocalSize
+import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
@@ -36,11 +37,13 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
+import io.github.angad7600123.cambio.MainActivity
 import io.github.angad7600123.cambio.R
 import io.github.angad7600123.cambio.calculator.CalcResult
 import io.github.angad7600123.cambio.calculator.CalculatorEngine
 import io.github.angad7600123.cambio.calculator.OperatorType
 import io.github.angad7600123.cambio.currency.ConversionEngine
+import io.github.angad7600123.cambio.currency.ConversionSide
 import io.github.angad7600123.cambio.currency.CurrencyCatalog
 import io.github.angad7600123.cambio.data.DataStoreRatesCache
 import io.github.angad7600123.cambio.data.SettingsRepository
@@ -92,38 +95,48 @@ class CambioWidget : GlanceAppWidget() {
             val prefs = currentState<Preferences>()
             val expression = prefs[WidgetStateKeys.EXPRESSION].orEmpty()
             val hasError = !prefs[WidgetStateKeys.ERROR].isNullOrEmpty()
+            val side = readSide(prefs[WidgetStateKeys.ACTIVE_SIDE])
 
-            val value = if (hasError) null else previewValue(expression)
-            val converted = if (value != null && snapshot != null) {
-                ConversionEngine.convert(
-                    amount = value,
-                    from = settings.fromCurrency,
-                    to = settings.toCurrency,
-                    rates = snapshot.rates,
-                )?.let { numberFormatter.formatMoney(it, catalog.infoFor(settings.toCurrency)) }
+            val typed = if (hasError) null else previewValue(expression)
+
+            // Whichever side is active holds what was typed; the other is converted
+            // from it, so the widget reads in both directions.
+            val typedCode =
+                if (side == ConversionSide.SOURCE) settings.fromCurrency else settings.toCurrency
+            val otherCode =
+                if (side == ConversionSide.SOURCE) settings.toCurrency else settings.fromCurrency
+            val otherValue = if (typed != null && snapshot != null) {
+                ConversionEngine.convert(typed, typedCode, otherCode, snapshot.rates)
             } else {
                 null
             }
 
-            val resultText = when {
+            val typedText = when {
                 hasError -> context.getString(R.string.calc_error_short)
-                value != null -> numberFormatter.format(value)
+                typed != null -> numberFormatter.format(typed)
                 else -> "0"
             }
+            val otherText = otherValue
+                ?.let { numberFormatter.formatMoney(it, catalog.infoFor(otherCode)) }
+                ?: PLACEHOLDER
 
             GlanceTheme {
                 WidgetBody(
-                    expressionText = expressionFormatter.formatSecondary(expression, resultText),
-                    resultText = resultText,
-                    convertedText = converted,
-                    fromCode = settings.fromCurrency,
-                    toCode = settings.toCurrency,
+                    leftValue = if (side == ConversionSide.SOURCE) typedText else otherText,
+                    rightValue = if (side == ConversionSide.TARGET) typedText else otherText,
+                    leftCode = settings.fromCurrency,
+                    rightCode = settings.toCurrency,
+                    activeSide = side,
                     isError = hasError,
                     palette = palette,
                 )
             }
         }
     }
+
+    /** Reads the stored side, defaulting to the right-hand figure. */
+    private fun readSide(stored: String?): ConversionSide = runCatching { ConversionSide.valueOf(stored.orEmpty()) }
+        .getOrDefault(ConversionSide.TARGET)
 
     /**
      * Evaluates what is typed so far, dropping a trailing operator so the preview
@@ -140,11 +153,11 @@ class CambioWidget : GlanceAppWidget() {
 
 @Composable
 private fun WidgetBody(
-    expressionText: String,
-    resultText: String,
-    convertedText: String?,
-    fromCode: String,
-    toCode: String,
+    leftValue: String,
+    rightValue: String,
+    leftCode: String,
+    rightCode: String,
+    activeSide: ConversionSide,
     isError: Boolean,
     palette: WidgetPalette,
 ) {
@@ -157,68 +170,122 @@ private fun WidgetBody(
             .padding(metrics.padding),
     ) {
         WidgetDisplay(
-            modifier = GlanceModifier.defaultWeight(),
-            expressionText = expressionText,
-            resultText = resultText,
-            convertedText = convertedText,
-            fromCode = fromCode,
-            toCode = toCode,
+            leftValue = leftValue,
+            rightValue = rightValue,
+            leftCode = leftCode,
+            rightCode = rightCode,
+            activeSide = activeSide,
             isError = isError,
             palette = palette,
             metrics = metrics,
         )
-        // The keypad is given its exact height rather than a weight. Stretching it
-        // made each row shorter than the key it holds, which clipped the circles
-        // into octagons; sizing it means the keys stay perfectly round.
-        WidgetKeypad(palette, metrics, GlanceModifier.height(metrics.keypadHeight))
+        // The keypad absorbs whatever the display does not use, and its rows share
+        // that space evenly. Giving the display the weight instead left a dead band
+        // of empty pixels above the figures.
+        WidgetKeypad(palette, metrics, GlanceModifier.defaultWeight())
     }
 }
 
+/**
+ * The two figures, side by side.
+ *
+ * Each column is one currency: its code above, its figure below. The active side
+ * is drawn in the foreground colour with its code tinted and the idle one recedes
+ * to grey, which is the same cue the app uses, so there is never any doubt about
+ * where the next digit lands.
+ *
+ * Tapping a figure moves the caret to that currency; tapping a code opens the app,
+ * where the full searchable picker lives.
+ */
 @Composable
 private fun WidgetDisplay(
-    modifier: GlanceModifier = GlanceModifier,
-    expressionText: String,
-    resultText: String,
-    convertedText: String?,
-    fromCode: String,
-    toCode: String,
+    leftValue: String,
+    rightValue: String,
+    leftCode: String,
+    rightCode: String,
+    activeSide: ConversionSide,
     isError: Boolean,
     palette: WidgetPalette,
     metrics: WidgetMetrics,
 ) {
-    Column(
-        modifier = modifier
+    Row(
+        modifier = GlanceModifier
             .fillMaxWidth()
-            .padding(horizontal = metrics.padding),
-        horizontalAlignment = Alignment.End,
-        verticalAlignment = Alignment.Bottom,
+            .padding(horizontal = 2.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        WidgetSide(
+            value = leftValue,
+            code = leftCode,
+            side = ConversionSide.SOURCE,
+            isActive = activeSide == ConversionSide.SOURCE,
+            alignEnd = false,
+            isError = isError,
+            palette = palette,
+            metrics = metrics,
+            modifier = GlanceModifier.defaultWeight(),
+        )
+        WidgetSide(
+            value = rightValue,
+            code = rightCode,
+            side = ConversionSide.TARGET,
+            isActive = activeSide == ConversionSide.TARGET,
+            alignEnd = true,
+            isError = isError,
+            palette = palette,
+            metrics = metrics,
+            modifier = GlanceModifier.defaultWeight(),
+        )
+    }
+}
+
+@Composable
+private fun WidgetSide(
+    value: String,
+    code: String,
+    side: ConversionSide,
+    isActive: Boolean,
+    alignEnd: Boolean,
+    isError: Boolean,
+    palette: WidgetPalette,
+    metrics: WidgetMetrics,
+    modifier: GlanceModifier = GlanceModifier,
+) {
+    val valueColor = when {
+        isError && isActive -> palette.destructive
+        isActive -> palette.textPrimary
+        else -> palette.textSecondary
+    }
+    val alignment = if (alignEnd) TextAlign.End else TextAlign.Start
+
+    Column(
+        modifier = modifier,
+        horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start,
     ) {
         Text(
-            text = expressionText.ifEmpty { " " },
+            text = code,
             maxLines = 1,
+            modifier = GlanceModifier.clickable(actionStartActivity<MainActivity>()),
             style = TextStyle(
-                color = palette.textSecondary,
-                fontSize = metrics.expressionSp.sp(),
-                textAlign = TextAlign.End,
+                color = if (isActive) palette.accentText else palette.textSecondary,
+                fontSize = metrics.codeSp.sp(),
+                fontWeight = FontWeight.Medium,
+                textAlign = alignment,
             ),
         )
         Text(
-            text = resultText,
+            text = value,
             maxLines = 1,
+            modifier = GlanceModifier.clickable(
+                actionRunCallback<WidgetSideActionCallback>(
+                    WidgetSideActionCallback.parametersOf(side),
+                ),
+            ),
             style = TextStyle(
-                color = if (isError) palette.destructive else palette.textPrimary,
+                color = valueColor,
                 fontSize = metrics.resultSp.sp(),
                 fontWeight = FontWeight.Medium,
-                textAlign = TextAlign.End,
-            ),
-        )
-        Text(
-            text = convertedText?.let { "$it $toCode" } ?: "$fromCode → $toCode",
-            maxLines = 1,
-            style = TextStyle(
-                color = palette.accentText,
-                fontSize = metrics.convertedSp.sp(),
-                textAlign = TextAlign.End,
+                textAlign = alignment,
             ),
         )
     }
@@ -235,7 +302,7 @@ private fun WidgetDisplay(
 private fun WidgetKeypad(palette: WidgetPalette, metrics: WidgetMetrics, modifier: GlanceModifier = GlanceModifier) {
     Column(modifier = modifier.fillMaxWidth()) {
         WIDGET_KEY_ROWS.forEach { row ->
-            WidgetRow(modifier = GlanceModifier.height(metrics.rowHeight)) {
+            WidgetRow(modifier = GlanceModifier.defaultWeight()) {
                 row.forEach { spec ->
                     WidgetKey(
                         label = spec.label,
@@ -335,6 +402,9 @@ private enum class WidgetKeyStyle(val backgroundRes: Int) {
  * checked too, so a short-but-wide widget shrinks its keys rather than clipping a
  * row.
  */
+/** Shown in place of a figure until rates are available. */
+private const val PLACEHOLDER = "—"
+
 private data class WidgetMetrics(
     val keyDiameter: Dp,
     val keyGap: Dp,
@@ -345,8 +415,7 @@ private data class WidgetMetrics(
     /** Width of one grid cell: the key plus its gutter. */
     val columnWidth: Dp,
     val resultSp: Float,
-    val convertedSp: Float,
-    val expressionSp: Float,
+    val codeSp: Float,
     val keyGlyphSp: Float,
 ) {
     companion object {
@@ -359,12 +428,15 @@ private data class WidgetMetrics(
         private const val ROWS = 5
 
         /**
-         * Share of the widget height reserved for the display.
+         * Share of the widget height the display needs.
          *
-         * Sized to fit all three lines at the ratios below; drop it much lower and
-         * the converted amount is the first thing to be clipped.
+         * Only two lines now that the figures sit side by side rather than stacked,
+         * which is what freed the space the keypad uses.
          */
-        private const val DISPLAY_SHARE = 0.26f
+        private const val DISPLAY_SHARE = 0.20f
+
+        /** Fraction of its row a key fills, leaving a little breathing room. */
+        private const val KEY_IN_ROW = 0.88f
 
         private val MIN_DIAMETER = 40.dp
         private val MAX_DIAMETER = 88.dp
@@ -373,10 +445,9 @@ private data class WidgetMetrics(
             val widthBudget = COLUMNS + (COLUMNS - 1) * GAP_RATIO + 2 * PADDING_RATIO
             val byWidth = size.width.value / widthBudget
 
-            // Each row occupies the key plus one gap, so the five rows need
-            // 5 * (1 + GAP_RATIO) diameters of height.
-            val heightBudget = ROWS * (1f + GAP_RATIO)
-            val byHeight = (size.height.value * (1f - DISPLAY_SHARE)) / heightBudget
+            // Rows share the keypad's height evenly, so a key must fit inside one
+            // row with a margin; without that the circle is clipped into an octagon.
+            val byHeight = (size.height.value * (1f - DISPLAY_SHARE)) / ROWS * KEY_IN_ROW
 
             val diameter = minOf(byWidth, byHeight)
                 .coerceIn(MIN_DIAMETER.value, MAX_DIAMETER.value)
@@ -398,9 +469,8 @@ private data class WidgetMetrics(
                 columnWidth = columnWidth.dp,
                 // Tied to the key size so the display is never lost above a large
                 // keypad, nor overpowering on a small one.
-                resultSp = diameter * 0.62f,
-                convertedSp = diameter * 0.30f,
-                expressionSp = diameter * 0.22f,
+                resultSp = diameter * 0.52f,
+                codeSp = diameter * 0.26f,
                 keyGlyphSp = diameter * 0.42f,
             )
         }

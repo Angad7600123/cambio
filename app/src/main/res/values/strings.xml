@@ -79,11 +79,13 @@
     <string name="cd_open_history">Open history</string>
     <string name="cd_open_settings">Open settings</string>
     <string name="cd_swap_currencies">Swap currencies</string>
-    <string name="cd_select_from_currency">Convert from %1$s, %2$s. Tap to change.</string>
-    <string name="cd_select_to_currency">Convert to %1$s, %2$s. Tap to change.</string>
     <string name="cd_converted_amount">%1$s %2$s</string>
     <string name="cd_refresh_rates">%1$s. Tap to refresh rates.</string>
     <string name="cd_retry_rates">%1$s. Tap to retry.</string>
+    <string name="cd_alphabet_index">Jump to letter</string>
+    <string name="cd_side_active">%1$s, active. Typing enters this currency.</string>
+    <string name="cd_side_inactive">%1$s. Tap to type in this currency.</string>
+    <string name="cd_pick_currency">%1$s, %2$s. Tap to change currency.</string>
     <string name="cd_currency_row">%1$s, %2$s</string>
     <string name="cd_currency_row_selected">%1$s, %2$s, selected</string>
 </resources>

@@ -10,6 +10,7 @@ import io.github.angad7600123.cambio.calculator.CalculatorKey
 import io.github.angad7600123.cambio.calculator.InputState
 import io.github.angad7600123.cambio.calculator.OperatorType
 import io.github.angad7600123.cambio.currency.ConversionEngine
+import io.github.angad7600123.cambio.currency.ConversionSide
 import io.github.angad7600123.cambio.currency.CurrencyCatalog
 import io.github.angad7600123.cambio.currency.CurrencyInfo
 import io.github.angad7600123.cambio.data.AppClock
@@ -31,6 +32,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
+import java.math.RoundingMode
+
+/** A four-way tuple, since the standard library stops at [Triple]. */
+private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 
 /**
  * Drives the calculator screen.
@@ -64,14 +69,22 @@ class CalculatorViewModel(
      */
     private val transientError = MutableStateFlow<CalcError?>(null)
 
+    /**
+     * Which currency the keypad is typing into.
+     *
+     * Conversion runs in whichever direction the active side implies, so the same
+     * keypad serves both "what is 50 dollars in euros" and the reverse.
+     */
+    private val activeSide = MutableStateFlow(ConversionSide.SOURCE)
+
     val uiState: StateFlow<CalculatorUiState> = combine(
-        combine(inputState, evaluatedExpression, transientError, ::Triple),
+        combine(inputState, evaluatedExpression, transientError, activeSide, ::Quad),
         settingsRepository.settings,
         ratesRepository.snapshot,
         ratesRepository.refreshState,
         historyRepository.history,
-    ) { (input, evaluated, _), settings, snapshot, refreshState, history ->
-        buildUiState(input, evaluated, settings, snapshot, refreshState, history)
+    ) { (input, evaluated, _, side), settings, snapshot, refreshState, history ->
+        buildUiState(input, evaluated, side, settings, snapshot, refreshState, history)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
@@ -116,6 +129,45 @@ class CalculatorViewModel(
             recordHistory(before.expression, after.expression)
         } else {
             evaluatedExpression.value = null
+        }
+    }
+
+    /**
+     * Moves the caret to the other currency.
+     *
+     * The figure carries across rather than resetting: whatever the other side was
+     * showing becomes the new input, so switching sides never loses the amount and
+     * the two readings stay equivalent.
+     */
+    fun onSelectSide(side: ConversionSide) {
+        if (activeSide.value == side) return
+
+        viewModelScope.launch {
+            val snapshot = ratesRepository.snapshot.first()
+            val settings = settingsRepository.settings.first()
+            val current = currentValue(inputState.value)
+
+            val carried = if (snapshot != null && current != null) {
+                val (fromCode, toCode) = if (side == ConversionSide.TARGET) {
+                    settings.fromCurrency to settings.toCurrency
+                } else {
+                    settings.toCurrency to settings.fromCurrency
+                }
+                ConversionEngine.convert(current, fromCode, toCode, snapshot.rates)
+            } else {
+                null
+            }
+
+            activeSide.value = side
+            if (carried != null) {
+                // Round to the currency the figure is moving into. Carrying the raw
+                // quotient would drop six decimal places into the input field.
+                val minorUnits = catalog.infoFor(
+                    if (side == ConversionSide.SOURCE) settings.fromCurrency else settings.toCurrency,
+                ).minorUnits
+                inputState.value = InputState(expression = carried.asInput(minorUnits))
+                evaluatedExpression.value = null
+            }
         }
     }
 
@@ -173,12 +225,11 @@ class CalculatorViewModel(
             val value = result.toBigDecimalOrNull()
 
             val converted = if (value != null && snapshot != null) {
-                ConversionEngine.convert(
-                    amount = value,
-                    from = settings.fromCurrency,
-                    to = settings.toCurrency,
-                    rates = snapshot.rates,
-                )?.let { numberFormatter.formatMoney(it, catalog.infoFor(settings.toCurrency)) }
+                val side = activeSide.value
+                val fromCode = if (side == ConversionSide.SOURCE) settings.fromCurrency else settings.toCurrency
+                val toCode = if (side == ConversionSide.SOURCE) settings.toCurrency else settings.fromCurrency
+                ConversionEngine.convert(value, fromCode, toCode, snapshot.rates)
+                    ?.let { numberFormatter.formatMoney(it, catalog.infoFor(toCode)) }
             } else {
                 null
             }
@@ -199,6 +250,7 @@ class CalculatorViewModel(
     private fun buildUiState(
         input: InputState,
         evaluated: String?,
+        side: ConversionSide,
         settings: UserSettings,
         snapshot: RateSnapshot?,
         refreshState: RefreshState,
@@ -208,38 +260,38 @@ class CalculatorViewModel(
         val to = catalog.infoFor(settings.toCurrency)
         val value = currentValue(input)
 
-        val resultDisplay = value?.let(numberFormatter::format) ?: ZERO_DISPLAY
-        val expressionDisplay = expressionFormatter.format(input.expression)
+        // What was typed belongs to the active side; the other side is converted
+        // from it, which is what makes the block work in both directions.
+        val typedCurrency = if (side == ConversionSide.SOURCE) from else to
+        val otherCurrency = if (side == ConversionSide.SOURCE) to else from
+        val otherValue = value?.let {
+            convertBetween(it, typedCurrency.code, otherCurrency.code, snapshot)
+        }
 
-        // The two lines swap roles around equals, the way One UI does it. While
-        // typing, the expression is the hero and the running total sits underneath;
-        // once evaluated, the result takes over and the expression shrinks above it.
+        val typedDisplay = value?.let(numberFormatter::format) ?: ZERO_DISPLAY
+        val otherDisplay = otherValue?.let { numberFormatter.formatMoney(it, otherCurrency) }
+
+        val typed = expressionFormatter.format(input.expression)
+
+        // The expression leads while typing and steps back once evaluated, which is
+        // One UI's behaviour. The figure itself always lives in the converter block,
+        // so the expression line is blank whenever it would only repeat it.
         val isEditing = evaluated == null
-        val primary: String
-        val secondary: String
-
-        if (isEditing) {
-            primary = expressionDisplay.ifEmpty { ZERO_DISPLAY }
-            // Suppress the preview while a bare number is being typed, where it
-            // would merely repeat the line above.
-            secondary = if (expressionDisplay.isEmpty() || resultDisplay == expressionDisplay) {
-                ""
-            } else {
-                resultDisplay
-            }
-        } else {
-            primary = resultDisplay
-            secondary = expressionFormatter.format(evaluated) + EQUALS_SUFFIX
+        val expressionDisplay = when {
+            !isEditing -> expressionFormatter.format(evaluated) + EQUALS_SUFFIX
+            typed == typedDisplay -> ""
+            else -> typed
         }
 
         return CalculatorUiState(
-            primaryDisplay = primary,
-            secondaryDisplay = secondary,
+            expressionDisplay = expressionDisplay,
+            sourceDisplay = if (side == ConversionSide.SOURCE) typedDisplay else otherDisplay.orEmpty(),
+            targetDisplay = if (side == ConversionSide.SOURCE) otherDisplay else typedDisplay,
+            activeSide = side,
             isEditing = isEditing,
             transientError = transientError.value,
             fromCurrency = from,
             toCurrency = to,
-            convertedDisplay = convertedDisplay(value, settings, snapshot, to),
             rateDisplay = rateDisplay(settings, snapshot, from, to),
             ratesStatus = ratesStatus(snapshot, refreshState),
             availableCurrencies = availableCurrencies(snapshot),
@@ -249,6 +301,17 @@ class CalculatorViewModel(
             themeMode = settings.themeMode,
             useSystemColors = settings.useSystemColors,
         )
+    }
+
+    /** Converts between two currencies, or null when rates are not yet available. */
+    private fun convertBetween(
+        amount: BigDecimal,
+        fromCode: String,
+        toCode: String,
+        snapshot: RateSnapshot?,
+    ): BigDecimal? {
+        if (snapshot == null) return null
+        return ConversionEngine.convert(amount, fromCode, toCode, snapshot.rates)
     }
 
     /**
@@ -269,22 +332,6 @@ class CalculatorViewModel(
         if (trimmed.isEmpty() || trimmed == input.expression) return null
 
         return (CalculatorEngine.evaluate(trimmed) as? CalcResult.Success)?.value
-    }
-
-    private fun convertedDisplay(
-        value: BigDecimal?,
-        settings: UserSettings,
-        snapshot: RateSnapshot?,
-        to: CurrencyInfo,
-    ): String? {
-        if (value == null || snapshot == null) return null
-        val converted = ConversionEngine.convert(
-            amount = value,
-            from = settings.fromCurrency,
-            to = settings.toCurrency,
-            rates = snapshot.rates,
-        ) ?: return null
-        return numberFormatter.formatMoney(converted, to)
     }
 
     private fun rateDisplay(
@@ -324,6 +371,10 @@ class CalculatorViewModel(
             toCurrency = catalog.infoFor(defaults.toCurrency),
         )
     }
+
+    /** Rounds a converted figure to something sane to keep typing into. */
+    private fun BigDecimal.asInput(minorUnits: Int): String =
+        setScale(minorUnits, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
 
     private fun String.toBigDecimalOrNull(): BigDecimal? = try {
         BigDecimal(this)

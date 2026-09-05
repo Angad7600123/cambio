@@ -2,6 +2,8 @@ package io.github.angad7600123.cambio.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -35,8 +37,8 @@ class CalculatorScreenTest {
     private val inr = CurrencyInfo("INR", "Indian Rupee", "₹", 2, "🇮🇳")
 
     private fun state(
-        primary: String = "0",
-        secondary: String = "",
+        expression: String = "",
+        source: String = "0",
         isEditing: Boolean = true,
         converted: String? = "945.40",
         rate: String? = "1 USD = 94.5405 INR",
@@ -46,12 +48,12 @@ class CalculatorScreenTest {
             isRefreshing = false,
         ),
     ) = CalculatorUiState(
-        primaryDisplay = primary,
-        secondaryDisplay = secondary,
+        expressionDisplay = expression,
+        sourceDisplay = source,
+        targetDisplay = converted,
         isEditing = isEditing,
         fromCurrency = usd,
         toCurrency = inr,
-        convertedDisplay = converted,
         rateDisplay = rate,
         ratesStatus = status,
     )
@@ -69,6 +71,7 @@ class CalculatorScreenTest {
                     state = uiState,
                     onKeyPress = onKey,
                     onSwapCurrencies = onSwap,
+                    onSelectSide = {},
                     onSelectFromCurrency = {},
                     onSelectToCurrency = {},
                     onRefreshRates = onRefresh,
@@ -132,20 +135,49 @@ class CalculatorScreenTest {
     }
 
     @Test
-    fun whileTypingTheExpressionIsTheLargeLineAndThePreviewSitsBelow() {
-        // One UI's hierarchy: the expression leads, the running total follows.
-        setScreen(state(primary = "1,234 × 2", secondary = "2,468", isEditing = true))
+    fun whileTypingTheExpressionLeadsAndTheFigureSitsInTheConverter() {
+        // One UI's hierarchy: the expression leads. The figure lives in the
+        // converter block, iOS-style, rather than on a second display line.
+        setScreen(state(expression = "1,234 × 2", source = "2,468", isEditing = true))
 
         composeRule.onNodeWithText("1,234 × 2", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("2,468").assertIsDisplayed()
     }
 
     @Test
-    fun afterEqualsTheResultBecomesTheLargeLine() {
-        setScreen(state(primary = "2,468", secondary = "1,234 × 2 =", isEditing = false))
+    fun afterEqualsTheExpressionStepsBack() {
+        setScreen(state(expression = "1,234 × 2 =", source = "2,468", isEditing = false))
 
         composeRule.onNodeWithText("2,468").assertIsDisplayed()
         composeRule.onNodeWithText("1,234 × 2 =").assertIsDisplayed()
+    }
+
+    @Test
+    fun tappingTheOtherFigureMovesTheCaretToThatCurrency() {
+        var side: io.github.angad7600123.cambio.currency.ConversionSide? = null
+        composeRule.setContent {
+            CambioTheme {
+                CalculatorScreen(
+                    state = state(),
+                    onKeyPress = {},
+                    onSwapCurrencies = {},
+                    onSelectSide = { side = it },
+                    onSelectFromCurrency = {},
+                    onSelectToCurrency = {},
+                    onRefreshRates = {},
+                    onRestoreHistory = {},
+                    onClearHistory = {},
+                    onThemeModeChange = {},
+                    onUseSystemColorsChange = {},
+                    onTransientErrorShown = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Tap to type in this currency", substring = true)
+            .performClick()
+
+        assertEquals(io.github.angad7600123.cambio.currency.ConversionSide.TARGET, side)
     }
 
     @Test
@@ -156,7 +188,7 @@ class CalculatorScreenTest {
     }
 
     @Test
-    fun currencyChipsShowBothCodes() {
+    fun bothCurrencyCodesAreShown() {
         setScreen(state())
 
         composeRule.onNodeWithText("USD").assertIsDisplayed()
@@ -261,13 +293,17 @@ class CalculatorScreenTest {
     }
 
     @Test
-    fun currencyPickerOpensFromTheChipAndCanBeSearched() {
+    fun tappingACurrencyCodeOpensTheSearchablePicker() {
         val screenState = state().copy(
             availableCurrencies = listOf(usd, inr, CurrencyInfo("EUR", "Euro", "€", 2, "🇪🇺")),
         )
         setScreen(screenState)
 
-        composeRule.onNodeWithContentDescription("Convert from", substring = true).performClick()
+        // The code beside each figure is the picker control, so there are two of
+        // them; either opens the same list.
+        composeRule.onAllNodesWithContentDescription("Tap to change currency", substring = true)
+            .onFirst()
+            .performClick()
 
         composeRule.onNodeWithText("Choose currency").assertIsDisplayed()
         composeRule.onNodeWithText("Euro", substring = true).assertIsDisplayed()
@@ -278,7 +314,7 @@ class CalculatorScreenTest {
         // One UI keeps the typed expression on screen and floats a brief message,
         // rather than blanking the display.
         setScreen(
-            state(primary = "5 ÷ 0", isEditing = true).copy(
+            state(expression = "5 ÷ 0", isEditing = true).copy(
                 transientError = io.github.angad7600123.cambio.calculator.CalcError.DIVIDE_BY_ZERO,
             ),
         )

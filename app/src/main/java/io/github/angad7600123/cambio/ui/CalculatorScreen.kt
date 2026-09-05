@@ -33,12 +33,12 @@ import androidx.compose.ui.unit.dp
 import io.github.angad7600123.cambio.R
 import io.github.angad7600123.cambio.calculator.CalcError
 import io.github.angad7600123.cambio.calculator.CalculatorKey
+import io.github.angad7600123.cambio.currency.ConversionSide
 import io.github.angad7600123.cambio.data.HistoryEntry
 import io.github.angad7600123.cambio.data.ThemeMode
 import io.github.angad7600123.cambio.ui.components.CalcToast
 import io.github.angad7600123.cambio.ui.components.CalculatorDisplay
-import io.github.angad7600123.cambio.ui.components.ConvertedAmount
-import io.github.angad7600123.cambio.ui.components.CurrencyBar
+import io.github.angad7600123.cambio.ui.components.ConverterBlock
 import io.github.angad7600123.cambio.ui.components.Keypad
 import io.github.angad7600123.cambio.ui.components.RateLine
 import io.github.angad7600123.cambio.ui.sheets.CurrencyPickerContent
@@ -74,6 +74,7 @@ fun CalculatorScreen(
     state: CalculatorUiState,
     onKeyPress: (CalculatorKey) -> Unit,
     onSwapCurrencies: () -> Unit,
+    onSelectSide: (ConversionSide) -> Unit,
     onSelectFromCurrency: (String) -> Unit,
     onSelectToCurrency: (String) -> Unit,
     onRefreshRates: () -> Unit,
@@ -101,6 +102,7 @@ fun CalculatorScreen(
                     state = state,
                     onKeyPress = onKeyPress,
                     onSwapCurrencies = onSwapCurrencies,
+                    onSelectSide = onSelectSide,
                     onRefreshRates = onRefreshRates,
                     onOpenSheet = { activeSheet = it },
                 )
@@ -109,6 +111,7 @@ fun CalculatorScreen(
                     state = state,
                     onKeyPress = onKeyPress,
                     onSwapCurrencies = onSwapCurrencies,
+                    onSelectSide = onSelectSide,
                     onRefreshRates = onRefreshRates,
                     onOpenSheet = { activeSheet = it },
                 )
@@ -186,6 +189,7 @@ private fun TallLayout(
     state: CalculatorUiState,
     onKeyPress: (CalculatorKey) -> Unit,
     onSwapCurrencies: () -> Unit,
+    onSelectSide: (ConversionSide) -> Unit,
     onRefreshRates: () -> Unit,
     onOpenSheet: (ActiveSheet) -> Unit,
 ) {
@@ -202,6 +206,7 @@ private fun TallLayout(
         DisplaySection(
             state = state,
             onSwapCurrencies = onSwapCurrencies,
+            onSelectSide = onSelectSide,
             onRefreshRates = onRefreshRates,
             onOpenSheet = onOpenSheet,
             modifier = Modifier
@@ -224,6 +229,7 @@ private fun WideLayout(
     state: CalculatorUiState,
     onKeyPress: (CalculatorKey) -> Unit,
     onSwapCurrencies: () -> Unit,
+    onSelectSide: (ConversionSide) -> Unit,
     onRefreshRates: () -> Unit,
     onOpenSheet: (ActiveSheet) -> Unit,
 ) {
@@ -243,6 +249,7 @@ private fun WideLayout(
             DisplaySection(
                 state = state,
                 onSwapCurrencies = onSwapCurrencies,
+                onSelectSide = onSelectSide,
                 onRefreshRates = onRefreshRates,
                 onOpenSheet = onOpenSheet,
                 modifier = Modifier
@@ -301,6 +308,7 @@ private fun TopBar(onHistoryClick: () -> Unit, onSettingsClick: () -> Unit, modi
 private fun DisplaySection(
     state: CalculatorUiState,
     onSwapCurrencies: () -> Unit,
+    onSelectSide: (ConversionSide) -> Unit,
     onRefreshRates: () -> Unit,
     onOpenSheet: (ActiveSheet) -> Unit,
     modifier: Modifier = Modifier,
@@ -311,38 +319,26 @@ private fun DisplaySection(
         horizontalAlignment = Alignment.End,
     ) {
         CalculatorDisplay(
-            primary = state.primaryDisplay,
-            secondary = state.secondaryDisplay,
+            expression = state.expressionDisplay,
             isEditing = state.isEditing,
             modifier = Modifier.weight(1f, fill = false),
         )
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Right-aligned so the result, the currency chips, the converted amount and
-        // the rate line all share one clean right edge, the way a calculator reads.
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            CurrencyBar(
-                from = state.fromCurrency,
-                to = state.toCurrency,
-                onFromClick = { onOpenSheet(ActiveSheet.FromCurrency) },
-                onToClick = { onOpenSheet(ActiveSheet.ToCurrency) },
-                onSwapClick = onSwapCurrencies,
-            )
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        ConvertedAmount(
-            amount = state.convertedDisplay,
-            currencyCode = state.toCurrency.code,
+        ConverterBlock(
+            sourceValue = state.sourceDisplay,
+            targetValue = state.targetDisplay,
+            from = state.fromCurrency,
+            to = state.toCurrency,
+            activeSide = state.activeSide,
+            onFromClick = { onOpenSheet(ActiveSheet.FromCurrency) },
+            onToClick = { onOpenSheet(ActiveSheet.ToCurrency) },
+            onSelectSide = onSelectSide,
+            onSwapClick = onSwapCurrencies,
         )
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         RateLine(
             status = state.ratesStatus,

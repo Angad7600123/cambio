@@ -38,9 +38,12 @@ same engine and the same theme.
 
 *Screenshots captured from the app running on a Pixel 10 Pro XL emulator.*
 
-The interface follows Samsung's One UI calculator closely — key sizes, gutters and
-palette were measured from it rather than approximated — while the currency row,
-converted amount and rate line are Cambio's own.
+The calculator follows Samsung's One UI closely: key sizes, gutters, palette and
+the press animation were measured from a screen recording of it rather than
+approximated. The conversion block and the currency picker follow the iOS
+Calculator's converter instead, because One UI's calculator has no equivalent to
+copy — paired figures with the code as the control, and an active side you type
+into.
 
 ## Features
 
@@ -53,8 +56,8 @@ converted amount and rate line are Cambio's own.
 - **Exact decimal arithmetic.** `0.1 + 0.2` is `0.3`, not `0.30000000000000004` —
   everything runs on `BigDecimal`, never binary floating point
 - Chained calculations, backspace and clear
-- **The expression leads while you type**, with the running total small beneath it;
-  pressing equals swaps them. Operators are tinted and a caret marks your place
+- **The expression leads while you type** and steps back once evaluated. Operators
+  are tinted, a caret marks your place, and each new character pops in
 - An incomplete expression floats a brief message and **leaves your input alone**,
   rather than blanking the display
 - Numbers beyond `Long` range, with scientific notation past `1e16`
@@ -62,8 +65,12 @@ converted amount and rate line are Cambio's own.
 **Currency**
 
 - 160+ currencies, live rates
+- **Convert in either direction.** Tap either figure to move the caret to that
+  currency and type there; the other side follows. The active figure is the bright
+  one, the idle one greys out. Values carry across when you switch, so nothing is
+  lost
 - Swap direction with one tap; searchable picker by code *or* name, with recents
-  pinned to the top and each row previewing its live rate
+  pinned, an A–Z rail, and each row previewing its live rate
 - Amounts rounded to each currency's real minor units — 2 for USD, **0 for JPY**,
   **3 for KWD** — escalating precision so a tiny amount never renders as a
   misleading `0.00`
@@ -71,8 +78,9 @@ converted amount and rate line are Cambio's own.
 
 **App**
 
-- Home-screen widget running the identical calculator and keypad, sized
-  proportionally so the keys and type scale with the widget
+- Home-screen widget running the identical calculator and keypad. Both currencies
+  sit side by side with a tappable active side, and every size is proportional to
+  the widget, so it stays legible from its smallest size upward
 - Light and dark themes, following the system by default, with an optional
   Material You / system-colour mode that picks up your device or OEM theme
 - Calculation history (last 100), tap to restore

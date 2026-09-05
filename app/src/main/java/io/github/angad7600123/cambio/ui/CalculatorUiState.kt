@@ -2,6 +2,7 @@ package io.github.angad7600123.cambio.ui
 
 import androidx.compose.runtime.Immutable
 import io.github.angad7600123.cambio.calculator.CalcError
+import io.github.angad7600123.cambio.currency.ConversionSide
 import io.github.angad7600123.cambio.currency.CurrencyInfo
 import io.github.angad7600123.cambio.data.HistoryEntry
 import io.github.angad7600123.cambio.data.RatesError
@@ -38,10 +39,19 @@ sealed interface RatesStatus {
  */
 @Immutable
 data class CalculatorUiState(
-    /** The large line: the expression while typing, the result after equals. */
-    val primaryDisplay: String = "0",
-    /** The small line beneath it: the running preview, or the evaluated expression. */
-    val secondaryDisplay: String = "",
+    /**
+     * The expression line above the converter.
+     *
+     * Blank while a bare number is being typed, because the converter's own top row
+     * already shows it and repeating it twice reads badly.
+     */
+    val expressionDisplay: String = "",
+    /** The figure in the source currency, for the converter's top row. */
+    val sourceDisplay: String = "0",
+    /** The figure in the target currency, for the converter's bottom row. */
+    val targetDisplay: String? = null,
+    /** Which side the keypad is typing into; the other side is derived from it. */
+    val activeSide: ConversionSide = ConversionSide.SOURCE,
     /**
      * True while an expression is being typed, so the primary line shows the caret
      * and tints its operators. False once equals has produced a result.
@@ -54,7 +64,6 @@ data class CalculatorUiState(
     val transientError: CalcError? = null,
     val fromCurrency: CurrencyInfo,
     val toCurrency: CurrencyInfo,
-    val convertedDisplay: String? = null,
     val rateDisplay: String? = null,
     val ratesStatus: RatesStatus = RatesStatus.Loading,
     val availableCurrencies: List<CurrencyInfo> = emptyList(),
@@ -66,5 +75,5 @@ data class CalculatorUiState(
     val useSystemColors: Boolean = false,
 ) {
     /** True when there is a value worth copying or converting. */
-    val hasValue: Boolean get() = primaryDisplay.isNotEmpty()
+    val hasValue: Boolean get() = sourceDisplay.isNotEmpty()
 }
