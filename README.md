@@ -70,7 +70,7 @@ into.
   one, the idle one greys out. Values carry across when you switch, so nothing is
   lost
 - Swap direction with one tap; searchable picker by code *or* name, with recents
-  pinned, an A–Z rail, and each row previewing its live rate
+  pinned, an A–Z scrubber with a letter bubble, and each row previewing its rate
 - Amounts rounded to each currency's real minor units — 2 for USD, **0 for JPY**,
   **3 for KWD** — escalating precision so a tiny amount never renders as a
   misleading `0.00`

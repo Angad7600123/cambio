@@ -20,6 +20,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,9 +32,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import io.github.angad7600123.cambio.R
 import io.github.angad7600123.cambio.currency.ConversionEngine
 import io.github.angad7600123.cambio.currency.CurrencyInfo
@@ -70,6 +69,7 @@ fun CurrencyPickerContent(
     val numberFormatter = remember { NumberDisplayFormatter() }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val firstVisible by remember { derivedStateOf { listState.firstVisibleItemIndex } }
 
     // What one unit of the source currency is worth in each row's currency.
     // Computed once per sheet rather than on every recomposition.
@@ -132,12 +132,14 @@ fun CurrencyPickerContent(
             return@Column
         }
 
-        Row(modifier = Modifier.heightIn(max = LIST_MAX_HEIGHT)) {
+        // The scrubber overlays the list rather than sitting beside it, so its
+        // bubble can hang over the rows the way One UI's does.
+        Box(modifier = Modifier.heightIn(max = LIST_MAX_HEIGHT)) {
             LazyColumn(
                 state = listState,
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(top = 8.dp),
+                    .fillMaxWidth()
+                    .padding(top = 8.dp, end = SCRUBBER_INSET),
             ) {
                 if (visibleRecents.isNotEmpty()) {
                     item { SectionHeader(stringResource(R.string.currency_section_recent)) }
@@ -166,49 +168,26 @@ fun CurrencyPickerContent(
             }
 
             if (query.isBlank() && letterOffsets.isNotEmpty()) {
-                AlphabetRail(
-                    letters = letterOffsets.keys.sorted(),
-                    onLetter = { letter ->
+                val letters = remember(letterOffsets) { letterOffsets.keys.sorted() }
+                // Which section the list is resting on, so the thumb reflects the
+                // scroll rather than only the last letter that was dragged to.
+                val currentLetter = remember(firstVisible, letters, letterOffsets) {
+                    letters.lastOrNull { letterOffsets.getValue(it) <= firstVisible }
+                }
+
+                IndexScrubber(
+                    letters = letters,
+                    currentLetter = currentLetter,
+                    onSeek = { letter ->
                         letterOffsets[letter]?.let { index ->
                             scope.launch { listState.scrollToItem(index) }
                         }
                     },
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 6.dp, top = 8.dp, bottom = 8.dp),
                 )
             }
-        }
-    }
-}
-
-/**
- * The A–Z rail down the right edge.
- *
- * With 160-plus currencies, scrolling to "Swiss Franc" by flinging is tedious; the
- * rail turns it into one tap.
- */
-@Composable
-private fun AlphabetRail(letters: List<Char>, onLetter: (Char) -> Unit) {
-    val colors = CambioTheme.colors
-    val description = stringResource(R.string.cd_alphabet_index)
-
-    Column(
-        modifier = Modifier
-            .width(RAIL_WIDTH)
-            .padding(end = 6.dp)
-            .semantics { contentDescription = description },
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        letters.forEach { letter ->
-            Text(
-                text = letter.toString(),
-                style = CambioTextStyles.Meta.copy(fontSize = RAIL_TEXT_SIZE, fontWeight = FontWeight.SemiBold),
-                color = colors.accentText,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onLetter(letter) }
-                    .padding(vertical = 1.dp),
-            )
         }
     }
 }
@@ -300,6 +279,7 @@ private fun List<CurrencyInfo>.filterByQuery(query: String): List<CurrencyInfo> 
 private const val PLACEHOLDER_FLAG = "🏳"
 private val SEARCH_RADIUS = 14.dp
 private val LIST_MAX_HEIGHT = 460.dp
-private val RAIL_WIDTH = 22.dp
+
+/** Keeps row content clear of the scrubber track. */
+private val SCRUBBER_INSET = 30.dp
 private val TICK_COLUMN = 28.dp
-private val RAIL_TEXT_SIZE = 10.sp

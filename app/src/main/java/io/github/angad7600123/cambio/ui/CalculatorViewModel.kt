@@ -281,8 +281,14 @@ class CalculatorViewModel(
             // grouping and operator glyphs while keeping the caret aligned.
             activeText = input.expression,
             activeCursor = input.cursor,
-            // Suppress the running total when it would only repeat the figure above.
-            activePreview = if (isEditing && previewText != groupingOf(input.expression)) {
+            // The running total is shown only when it says something the line above
+            // does not: not for an empty field, and not when it would merely repeat
+            // the figure already displayed.
+            activePreview = if (
+                isEditing &&
+                input.expression.isNotEmpty() &&
+                previewText != groupingOf(input.expression)
+            ) {
                 previewText
             } else {
                 ""
