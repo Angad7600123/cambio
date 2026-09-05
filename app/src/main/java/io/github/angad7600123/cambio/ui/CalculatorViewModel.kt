@@ -165,10 +165,15 @@ class CalculatorViewModel(
                 val minorUnits = catalog.infoFor(
                     if (side == ConversionSide.SOURCE) settings.fromCurrency else settings.toCurrency,
                 ).minorUnits
-                inputState.value = InputState(expression = carried.asInput(minorUnits))
+                inputState.value = InputState.atEnd(carried.asInput(minorUnits))
                 evaluatedExpression.value = null
             }
         }
+    }
+
+    /** Moves the caret, so a digit can be corrected mid-number. */
+    fun onCursorChange(position: Int) {
+        inputState.value = CalculatorInput.moveCursor(inputState.value, position)
     }
 
     /** Called once the toast has been shown for its duration. */
@@ -202,7 +207,7 @@ class CalculatorViewModel(
 
     /** Restores a past calculation into the display. */
     fun onRestoreHistory(entry: HistoryEntry) {
-        inputState.value = InputState(expression = entry.expression)
+        inputState.value = InputState.atEnd(entry.expression)
         evaluatedExpression.value = null
     }
 
@@ -262,33 +267,33 @@ class CalculatorViewModel(
 
         // What was typed belongs to the active side; the other side is converted
         // from it, which is what makes the block work in both directions.
-        val typedCurrency = if (side == ConversionSide.SOURCE) from else to
+        val activeCurrency = if (side == ConversionSide.SOURCE) from else to
         val otherCurrency = if (side == ConversionSide.SOURCE) to else from
-        val otherValue = value?.let {
-            convertBetween(it, typedCurrency.code, otherCurrency.code, snapshot)
+        val otherAmount = value?.let {
+            convertBetween(it, activeCurrency.code, otherCurrency.code, snapshot)
         }
 
-        val typedDisplay = value?.let(numberFormatter::format) ?: ZERO_DISPLAY
-        val otherDisplay = otherValue?.let { numberFormatter.formatMoney(it, otherCurrency) }
-
-        val typed = expressionFormatter.format(input.expression)
-
-        // The expression leads while typing and steps back once evaluated, which is
-        // One UI's behaviour. The figure itself always lives in the converter block,
-        // so the expression line is blank whenever it would only repeat it.
+        val previewText = value?.let(numberFormatter::format) ?: ZERO_DISPLAY
         val isEditing = evaluated == null
-        val expressionDisplay = when {
-            !isEditing -> expressionFormatter.format(evaluated) + EQUALS_SUFFIX
-            typed == typedDisplay -> ""
-            else -> typed
-        }
 
         return CalculatorUiState(
-            expressionDisplay = expressionDisplay,
-            sourceDisplay = if (side == ConversionSide.SOURCE) typedDisplay else otherDisplay.orEmpty(),
-            targetDisplay = if (side == ConversionSide.SOURCE) otherDisplay else typedDisplay,
+            // The raw expression drives the field; the visual transformation adds
+            // grouping and operator glyphs while keeping the caret aligned.
+            activeText = input.expression,
+            activeCursor = input.cursor,
+            // Suppress the running total when it would only repeat the figure above.
+            activePreview = if (isEditing && previewText != groupingOf(input.expression)) {
+                previewText
+            } else {
+                ""
+            },
+            evaluatedExpression = evaluated
+                ?.let { expressionFormatter.format(it) + EQUALS_SUFFIX }
+                .orEmpty(),
+            otherValue = otherAmount
+                ?.let { numberFormatter.formatMoney(it, otherCurrency) }
+                ?: PLACEHOLDER,
             activeSide = side,
-            isEditing = isEditing,
             transientError = transientError.value,
             fromCurrency = from,
             toCurrency = to,
@@ -302,6 +307,12 @@ class CalculatorViewModel(
             useSystemColors = settings.useSystemColors,
         )
     }
+
+    /**
+     * The expression as it will appear once grouped, used only to decide whether the
+     * running total would be a duplicate of it.
+     */
+    private fun groupingOf(expression: String): String = expressionFormatter.format(expression)
 
     /** Converts between two currencies, or null when rates are not yet available. */
     private fun convertBetween(
@@ -385,6 +396,7 @@ class CalculatorViewModel(
     private companion object {
         const val STOP_TIMEOUT_MILLIS = 5_000L
         const val ZERO_DISPLAY = "0"
+        const val PLACEHOLDER = "\u2014"
         const val EQUALS_SUFFIX = " ="
     }
 }

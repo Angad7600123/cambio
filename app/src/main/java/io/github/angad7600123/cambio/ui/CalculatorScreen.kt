@@ -37,7 +37,6 @@ import io.github.angad7600123.cambio.currency.ConversionSide
 import io.github.angad7600123.cambio.data.HistoryEntry
 import io.github.angad7600123.cambio.data.ThemeMode
 import io.github.angad7600123.cambio.ui.components.CalcToast
-import io.github.angad7600123.cambio.ui.components.CalculatorDisplay
 import io.github.angad7600123.cambio.ui.components.ConverterBlock
 import io.github.angad7600123.cambio.ui.components.Keypad
 import io.github.angad7600123.cambio.ui.components.RateLine
@@ -75,6 +74,7 @@ fun CalculatorScreen(
     onKeyPress: (CalculatorKey) -> Unit,
     onSwapCurrencies: () -> Unit,
     onSelectSide: (ConversionSide) -> Unit,
+    onCursorChange: (Int) -> Unit,
     onSelectFromCurrency: (String) -> Unit,
     onSelectToCurrency: (String) -> Unit,
     onRefreshRates: () -> Unit,
@@ -103,6 +103,7 @@ fun CalculatorScreen(
                     onKeyPress = onKeyPress,
                     onSwapCurrencies = onSwapCurrencies,
                     onSelectSide = onSelectSide,
+                    onCursorChange = onCursorChange,
                     onRefreshRates = onRefreshRates,
                     onOpenSheet = { activeSheet = it },
                 )
@@ -112,6 +113,7 @@ fun CalculatorScreen(
                     onKeyPress = onKeyPress,
                     onSwapCurrencies = onSwapCurrencies,
                     onSelectSide = onSelectSide,
+                    onCursorChange = onCursorChange,
                     onRefreshRates = onRefreshRates,
                     onOpenSheet = { activeSheet = it },
                 )
@@ -190,6 +192,7 @@ private fun TallLayout(
     onKeyPress: (CalculatorKey) -> Unit,
     onSwapCurrencies: () -> Unit,
     onSelectSide: (ConversionSide) -> Unit,
+    onCursorChange: (Int) -> Unit,
     onRefreshRates: () -> Unit,
     onOpenSheet: (ActiveSheet) -> Unit,
 ) {
@@ -207,6 +210,7 @@ private fun TallLayout(
             state = state,
             onSwapCurrencies = onSwapCurrencies,
             onSelectSide = onSelectSide,
+            onCursorChange = onCursorChange,
             onRefreshRates = onRefreshRates,
             onOpenSheet = onOpenSheet,
             modifier = Modifier
@@ -230,6 +234,7 @@ private fun WideLayout(
     onKeyPress: (CalculatorKey) -> Unit,
     onSwapCurrencies: () -> Unit,
     onSelectSide: (ConversionSide) -> Unit,
+    onCursorChange: (Int) -> Unit,
     onRefreshRates: () -> Unit,
     onOpenSheet: (ActiveSheet) -> Unit,
 ) {
@@ -250,6 +255,7 @@ private fun WideLayout(
                 state = state,
                 onSwapCurrencies = onSwapCurrencies,
                 onSelectSide = onSelectSide,
+                onCursorChange = onCursorChange,
                 onRefreshRates = onRefreshRates,
                 onOpenSheet = onOpenSheet,
                 modifier = Modifier
@@ -301,14 +307,15 @@ private fun TopBar(onHistoryClick: () -> Unit, onSettingsClick: () -> Unit, modi
 }
 
 /**
- * The display stack: expression and result, the currency selectors, the converted
- * amount, and the rate line.
+ * The display stack: the converter block, which is also the primary display, and
+ * the rate line beneath it.
  */
 @Composable
 private fun DisplaySection(
     state: CalculatorUiState,
     onSwapCurrencies: () -> Unit,
     onSelectSide: (ConversionSide) -> Unit,
+    onCursorChange: (Int) -> Unit,
     onRefreshRates: () -> Unit,
     onOpenSheet: (ActiveSheet) -> Unit,
     modifier: Modifier = Modifier,
@@ -318,20 +325,16 @@ private fun DisplaySection(
         verticalArrangement = Arrangement.Bottom,
         horizontalAlignment = Alignment.End,
     ) {
-        CalculatorDisplay(
-            expression = state.expressionDisplay,
-            isEditing = state.isEditing,
-            modifier = Modifier.weight(1f, fill = false),
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
         ConverterBlock(
-            sourceValue = state.sourceDisplay,
-            targetValue = state.targetDisplay,
+            activeText = state.activeText,
+            activeCursor = state.activeCursor,
+            activePreview = state.activePreview,
+            evaluatedExpression = state.evaluatedExpression,
+            otherValue = state.otherValue,
             from = state.fromCurrency,
             to = state.toCurrency,
             activeSide = state.activeSide,
+            onCursorChange = onCursorChange,
             onFromClick = { onOpenSheet(ActiveSheet.FromCurrency) },
             onToClick = { onOpenSheet(ActiveSheet.ToCurrency) },
             onSelectSide = onSelectSide,

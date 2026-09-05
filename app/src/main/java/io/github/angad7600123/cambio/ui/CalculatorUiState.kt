@@ -40,23 +40,23 @@ sealed interface RatesStatus {
 @Immutable
 data class CalculatorUiState(
     /**
-     * The expression line above the converter.
-     *
-     * Blank while a bare number is being typed, because the converter's own top row
-     * already shows it and repeating it twice reads badly.
+     * The raw expression being typed, in the active currency. This is the app's
+     * primary display: it is the large line, not a separate small row.
      */
-    val expressionDisplay: String = "",
-    /** The figure in the source currency, for the converter's top row. */
-    val sourceDisplay: String = "0",
-    /** The figure in the target currency, for the converter's bottom row. */
-    val targetDisplay: String? = null,
+    val activeText: String = "",
+    /** Caret position within [activeText]. */
+    val activeCursor: Int = 0,
+    /**
+     * The running total, shown small under the active figure while an operation is
+     * in progress. Blank when it would only repeat the line above.
+     */
+    val activePreview: String = "",
+    /** After equals, the expression that produced the result. Blank while typing. */
+    val evaluatedExpression: String = "",
+    /** The figure in the other currency. */
+    val otherValue: String = "0",
     /** Which side the keypad is typing into; the other side is derived from it. */
     val activeSide: ConversionSide = ConversionSide.SOURCE,
-    /**
-     * True while an expression is being typed, so the primary line shows the caret
-     * and tints its operators. False once equals has produced a result.
-     */
-    val isEditing: Boolean = true,
     /**
      * A transient failure to surface as a toast. One UI does not blank the display
      * on a bad expression, it floats a brief message and leaves the input intact.
@@ -75,5 +75,5 @@ data class CalculatorUiState(
     val useSystemColors: Boolean = false,
 ) {
     /** True when there is a value worth copying or converting. */
-    val hasValue: Boolean get() = sourceDisplay.isNotEmpty()
+    val hasValue: Boolean get() = activeText.isNotEmpty()
 }

@@ -37,10 +37,10 @@ class CalculatorScreenTest {
     private val inr = CurrencyInfo("INR", "Indian Rupee", "₹", 2, "🇮🇳")
 
     private fun state(
-        expression: String = "",
-        source: String = "0",
-        isEditing: Boolean = true,
-        converted: String? = "945.40",
+        activeText: String = "",
+        evaluatedExpression: String = "",
+        preview: String = "",
+        other: String = "945.40",
         rate: String? = "1 USD = 94.5405 INR",
         status: RatesStatus = RatesStatus.Ready(
             lastUpdatedEpochSeconds = 1_788_480_151L,
@@ -48,10 +48,11 @@ class CalculatorScreenTest {
             isRefreshing = false,
         ),
     ) = CalculatorUiState(
-        expressionDisplay = expression,
-        sourceDisplay = source,
-        targetDisplay = converted,
-        isEditing = isEditing,
+        activeText = activeText,
+        activeCursor = activeText.length,
+        activePreview = preview,
+        evaluatedExpression = evaluatedExpression,
+        otherValue = other,
         fromCurrency = usd,
         toCurrency = inr,
         rateDisplay = rate,
@@ -72,6 +73,7 @@ class CalculatorScreenTest {
                     onKeyPress = onKey,
                     onSwapCurrencies = onSwap,
                     onSelectSide = {},
+                    onCursorChange = {},
                     onSelectFromCurrency = {},
                     onSelectToCurrency = {},
                     onRefreshRates = onRefresh,
@@ -138,7 +140,8 @@ class CalculatorScreenTest {
     fun whileTypingTheExpressionLeadsAndTheFigureSitsInTheConverter() {
         // One UI's hierarchy: the expression leads. The figure lives in the
         // converter block, iOS-style, rather than on a second display line.
-        setScreen(state(expression = "1,234 × 2", source = "2,468", isEditing = true))
+        // The figure being typed is the large line; the running total sits under it.
+        setScreen(state(activeText = "1234*2", preview = "2,468"))
 
         composeRule.onNodeWithText("1,234 × 2", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("2,468").assertIsDisplayed()
@@ -146,7 +149,7 @@ class CalculatorScreenTest {
 
     @Test
     fun afterEqualsTheExpressionStepsBack() {
-        setScreen(state(expression = "1,234 × 2 =", source = "2,468", isEditing = false))
+        setScreen(state(activeText = "2468", evaluatedExpression = "1,234 × 2 ="))
 
         composeRule.onNodeWithText("2,468").assertIsDisplayed()
         composeRule.onNodeWithText("1,234 × 2 =").assertIsDisplayed()
@@ -162,6 +165,7 @@ class CalculatorScreenTest {
                     onKeyPress = {},
                     onSwapCurrencies = {},
                     onSelectSide = { side = it },
+                    onCursorChange = {},
                     onSelectFromCurrency = {},
                     onSelectToCurrency = {},
                     onRefreshRates = {},
@@ -182,7 +186,7 @@ class CalculatorScreenTest {
 
     @Test
     fun convertedAmountAndCurrencyCodeAreShown() {
-        setScreen(state(converted = "945.40"))
+        setScreen(state(other = "945.40"))
 
         composeRule.onNodeWithText("945.40").assertIsDisplayed()
     }
@@ -193,6 +197,14 @@ class CalculatorScreenTest {
 
         composeRule.onNodeWithText("USD").assertIsDisplayed()
         composeRule.onNodeWithText("INR").assertIsDisplayed()
+    }
+
+    @Test
+    fun aLongFigureShrinksInsteadOfBeingClipped() {
+        // Fourteen digits. The whole figure must be present, not sliced at the front.
+        setScreen(state(activeText = "12345678901234"))
+
+        composeRule.onNodeWithText("12,345,678,901,234", substring = true).assertIsDisplayed()
     }
 
     @Test
@@ -237,7 +249,7 @@ class CalculatorScreenTest {
         var refreshes = 0
         val pressed = mutableListOf<CalculatorKey>()
         setScreen(
-            state(converted = null, rate = null, status = RatesStatus.Unavailable(RatesError.Network)),
+            state(other = "—", rate = null, status = RatesStatus.Unavailable(RatesError.Network)),
             onKey = { pressed += it },
             onRefresh = { refreshes++ },
         )
@@ -255,7 +267,7 @@ class CalculatorScreenTest {
     fun loadingStateShowsNoErrorAndKeypadStillWorks() {
         val pressed = mutableListOf<CalculatorKey>()
         setScreen(
-            state(converted = null, rate = null, status = RatesStatus.Loading),
+            state(other = "—", rate = null, status = RatesStatus.Loading),
             onKey = { pressed += it },
         )
 
@@ -314,7 +326,7 @@ class CalculatorScreenTest {
         // One UI keeps the typed expression on screen and floats a brief message,
         // rather than blanking the display.
         setScreen(
-            state(expression = "5 ÷ 0", isEditing = true).copy(
+            state(activeText = "5/0").copy(
                 transientError = io.github.angad7600123.cambio.calculator.CalcError.DIVIDE_BY_ZERO,
             ),
         )

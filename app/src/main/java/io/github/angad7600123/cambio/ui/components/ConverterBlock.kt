@@ -1,10 +1,14 @@
 package io.github.angad7600123.cambio.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,9 +16,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.UnfoldMore
@@ -22,47 +28,66 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.github.angad7600123.cambio.R
 import io.github.angad7600123.cambio.currency.ConversionSide
 import io.github.angad7600123.cambio.currency.CurrencyInfo
+import io.github.angad7600123.cambio.format.NumberDisplayFormatter
 import io.github.angad7600123.cambio.ui.theme.CambioTextStyles
 import io.github.angad7600123.cambio.ui.theme.CambioTheme
 
 /**
- * The currency conversion block.
+ * The conversion block, and the app's primary display.
  *
- * Two stacked rows separated by a rule, each pairing a figure with its currency
- * code, and a swap control sitting on the rule at the left — the layout iOS uses
- * for unit conversion. The code *is* the picker: tapping it opens the list, which
- * is why there is no separate row of dropdowns above the keypad.
+ * The active currency's figure *is* the big line — it is not a separate small row
+ * beneath an empty display. That single decision is what keeps the caret attached
+ * to the number you are typing, lets the type shrink to fit a long figure, and
+ * removes the empty band that otherwise sits above everything.
  *
- * This is the one part of the interface that does not follow One UI, because One
- * UI's calculator has nothing equivalent to copy.
+ * Structurally it follows the iOS converter: two figures, each paired with its
+ * currency code, a rule between them and the swap control on the rule. The active
+ * figure is an editable field, so the caret can be placed anywhere in it and digits
+ * inserted mid-number; the idle figure is plain text.
  *
- * @param amount the value in the source currency, already formatted.
- * @param converted the value in the target currency, or null while rates load.
+ * @param activeText the raw expression being typed, in the active currency.
+ * @param activePreview the running total, shown small only when an operation is in
+ *   progress and it would not merely repeat [activeText].
+ * @param evaluatedExpression the expression that produced the current result, shown
+ *   above after equals.
  */
 @Composable
 fun ConverterBlock(
-    sourceValue: String,
-    targetValue: String?,
+    activeText: String,
+    activeCursor: Int,
+    activePreview: String,
+    evaluatedExpression: String,
+    otherValue: String,
     from: CurrencyInfo,
     to: CurrencyInfo,
     activeSide: ConversionSide,
+    onCursorChange: (Int) -> Unit,
     onFromClick: () -> Unit,
     onToClick: () -> Unit,
     onSelectSide: (ConversionSide) -> Unit,
@@ -70,83 +95,125 @@ fun ConverterBlock(
     modifier: Modifier = Modifier,
 ) {
     val colors = CambioTheme.colors
+    val activeCurrency = if (activeSide == ConversionSide.SOURCE) from else to
+    val idleCurrency = if (activeSide == ConversionSide.SOURCE) to else from
 
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        SwapButton(onClick = onSwapClick)
-
-        Column(modifier = Modifier.weight(1f)) {
-            ConverterRow(
-                value = sourceValue,
-                currency = from,
-                isActive = activeSide == ConversionSide.SOURCE,
-                onActivate = { onSelectSide(ConversionSide.SOURCE) },
-                onPickCurrency = onFromClick,
+    Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
+        // Only present after equals, where One UI puts the expression that produced
+        // the result above it.
+        if (evaluatedExpression.isNotEmpty()) {
+            Text(
+                text = evaluatedExpression,
+                style = CambioTextStyles.Secondary,
+                color = colors.textSecondary,
+                maxLines = 1,
+                textAlign = TextAlign.End,
+                modifier = Modifier.padding(bottom = 2.dp),
             )
+        }
 
-            HorizontalDivider(
-                color = colors.outline,
-                modifier = Modifier.padding(vertical = 6.dp),
-            )
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            SwapButton(onClick = onSwapClick)
 
-            ConverterRow(
-                value = targetValue ?: PLACEHOLDER,
-                currency = to,
-                isActive = activeSide == ConversionSide.TARGET,
-                onActivate = { onSelectSide(ConversionSide.TARGET) },
-                onPickCurrency = onToClick,
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                ActiveRow(
+                    text = activeText,
+                    cursor = activeCursor,
+                    currency = activeCurrency,
+                    onCursorChange = onCursorChange,
+                    onPickCurrency = if (activeSide == ConversionSide.SOURCE) onFromClick else onToClick,
+                )
+
+                if (activePreview.isNotEmpty()) {
+                    Text(
+                        text = activePreview,
+                        style = CambioTextStyles.Secondary,
+                        color = colors.textSecondary,
+                        maxLines = 1,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(end = CODE_COLUMN),
+                    )
+                }
+
+                HorizontalDivider(
+                    color = colors.outline,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+
+                IdleRow(
+                    value = otherValue,
+                    currency = idleCurrency,
+                    onActivate = { onSelectSide(activeSide.opposite()) },
+                    onPickCurrency = if (activeSide == ConversionSide.SOURCE) onToClick else onFromClick,
+                )
+            }
         }
     }
 }
 
 /**
- * One side of the conversion: the figure, then its currency code as a control.
+ * The figure being typed into, and the app's largest element.
  *
- * Two separate targets share the row. Tapping the figure moves the caret to this
- * currency; tapping the code opens the picker. The active figure is drawn in the
- * foreground colour and the idle one recedes to grey — the only cue needed to show
- * where the next digit will land, with no border or fill to clutter the display.
+ * A [BasicTextField] rather than a Text, so the caret can be placed anywhere in the
+ * number and digits inserted mid-string — the thing a plain read-only display
+ * cannot do.
+ *
+ * The field is `readOnly`, which keeps the system keyboard away and blocks IME
+ * edits while still letting a tap position the caret. Compose does not paint a
+ * caret for a read-only field, so one is drawn here from the text layout: that is
+ * the only way to have both a visible caret and no keyboard.
  */
 @Composable
-private fun ConverterRow(
-    value: String,
+private fun ActiveRow(
+    text: String,
+    cursor: Int,
     currency: CurrencyInfo,
-    isActive: Boolean,
-    onActivate: () -> Unit,
+    onCursorChange: (Int) -> Unit,
     onPickCurrency: () -> Unit,
 ) {
     val colors = CambioTheme.colors
+    val formatter = remember { NumberDisplayFormatter() }
 
-    val valueColor by animateColorAsState(
-        targetValue = if (isActive) colors.textPrimary else colors.textSecondary,
-        animationSpec = tween(durationMillis = ACTIVATE_MILLIS),
-        label = "converterValueColor",
+    // Each new character lands small and grows, as One UI's does. Scaling is applied
+    // inside the transformation so only the newest glyph moves.
+    val entryScale = rememberEntryScale(text)
+    val transformation = remember(colors.accentText, entryScale) {
+        ExpressionTransformation.forLocale(colors.accentText, formatter, entryScale)
+    }
+    val transformed = remember(text, transformation) { transformation.filter(AnnotatedString(text)) }
+
+    val target = remember(transformed.text.length) { heroSizeFor(transformed.text.length) }
+    val animatedSize by animateFloatAsState(
+        targetValue = target,
+        animationSpec = tween(durationMillis = RESIZE_MILLIS),
+        label = "heroFontSize",
     )
 
-    // The active figure is where digits land when no operator has been typed, so it
-    // carries the same pop-in the expression line uses. The idle side changes only
-    // because the other side was edited, so it should not pop.
-    val entryScale = rememberEntryScale(value)
-    val styled = buildDisplayText(
-        text = value,
-        operatorColor = colors.accentText,
-        caretColor = Color.Transparent,
-        showCaret = false,
-        lastCharScale = if (isActive) entryScale else 1f,
-        baseFontSize = CambioTextStyles.Converted.fontSize,
+    // A square-wave blink, matching a text caret rather than a smooth pulse.
+    val blinkTransition = rememberInfiniteTransition(label = "caret")
+    val caretAlpha by blinkTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = CARET_PERIOD_MILLIS
+                1f at 0
+                1f at CARET_PERIOD_MILLIS / 2
+                0f at CARET_PERIOD_MILLIS / 2 + 1
+                0f at CARET_PERIOD_MILLIS
+            },
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "caretAlpha",
     )
 
-    val activateDescription = stringResource(
-        if (isActive) R.string.cd_side_active else R.string.cd_side_inactive,
-        currency.displayName,
-    )
-    val pickDescription = stringResource(
-        R.string.cd_pick_currency,
-        currency.displayName,
-        currency.code,
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    val caretColor = colors.accentText
+    val selectionColors = TextSelectionColors(
+        handleColor = caretColor,
+        backgroundColor = caretColor.copy(alpha = SELECTION_ALPHA),
     )
 
     Row(
@@ -154,49 +221,121 @@ private fun ConverterRow(
         verticalAlignment = Alignment.Bottom,
         horizontalArrangement = Arrangement.End,
     ) {
+        CompositionLocalProvider(LocalTextSelectionColors provides selectionColors) {
+            BasicTextField(
+                value = TextFieldValue(
+                    text = text,
+                    selection = TextRange(cursor.coerceIn(0, text.length)),
+                ),
+                // Only the caret can move from here; the text itself is owned by the
+                // calculator state and changed exclusively by the keypad.
+                onValueChange = { onCursorChange(it.selection.start) },
+                readOnly = true,
+                singleLine = true,
+                visualTransformation = transformation,
+                onTextLayout = { layout = it },
+                textStyle = CambioTextStyles.Display.copy(
+                    fontSize = animatedSize.sp,
+                    color = colors.textPrimary,
+                    textAlign = TextAlign.End,
+                ),
+                modifier = Modifier
+                    .weight(1f)
+                    .drawWithContent {
+                        drawContent()
+                        val result = layout ?: return@drawWithContent
+                        if (caretAlpha <= 0f) return@drawWithContent
+
+                        // The layout describes the *transformed* string, so the caret
+                        // has to be mapped out of the raw expression first.
+                        val offset = transformed.offsetMapping
+                            .originalToTransformed(cursor.coerceIn(0, text.length))
+                            .coerceIn(0, result.layoutInput.text.length)
+                        val rect = result.getCursorRect(offset)
+
+                        drawLine(
+                            color = caretColor.copy(alpha = caretAlpha),
+                            start = Offset(rect.left, rect.top),
+                            end = Offset(rect.left, rect.bottom),
+                            strokeWidth = CARET_WIDTH.toPx(),
+                            cap = StrokeCap.Round,
+                        )
+                    },
+            )
+        }
+
+        CurrencyControl(currency = currency, onClick = onPickCurrency, isActive = true)
+    }
+}
+
+/** The other currency: plain text, tappable to move the caret to it. */
+@Composable
+private fun IdleRow(value: String, currency: CurrencyInfo, onActivate: () -> Unit, onPickCurrency: () -> Unit) {
+    val colors = CambioTheme.colors
+    val target = remember(value.length) { idleSizeFor(value.length) }
+    val animatedSize by animateFloatAsState(
+        targetValue = target,
+        animationSpec = tween(durationMillis = RESIZE_MILLIS),
+        label = "idleFontSize",
+    )
+    val description = stringResource(R.string.cd_side_inactive, currency.displayName)
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.End,
+    ) {
         Text(
-            text = styled,
-            style = CambioTextStyles.Converted,
-            color = valueColor,
+            text = value,
+            style = CambioTextStyles.Display.copy(fontSize = animatedSize.sp),
+            color = colors.textSecondary,
             maxLines = 1,
             textAlign = TextAlign.End,
             modifier = Modifier
-                .weight(1f, fill = false)
+                .weight(1f)
                 .clip(RoundedCornerShape(ROW_RADIUS))
                 .clickable(onClick = onActivate)
-                .padding(horizontal = 6.dp, vertical = 4.dp)
-                .horizontalScroll(rememberScrollState(), reverseScrolling = true)
-                .semantics { contentDescription = activateDescription },
+                .padding(vertical = 2.dp)
+                .semantics { contentDescription = description },
         )
 
-        Row(
+        CurrencyControl(currency = currency, onClick = onPickCurrency, isActive = false)
+    }
+}
+
+/** The currency code, which doubles as the picker control. */
+@Composable
+private fun CurrencyControl(currency: CurrencyInfo, onClick: () -> Unit, isActive: Boolean) {
+    val colors = CambioTheme.colors
+    val codeColor by animateColorAsState(
+        targetValue = if (isActive) colors.accentText else colors.textSecondary,
+        animationSpec = tween(durationMillis = ACTIVATE_MILLIS),
+        label = "codeColor",
+    )
+    val description = stringResource(R.string.cd_pick_currency, currency.displayName, currency.code)
+
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(ROW_RADIUS))
+            .clickable(onClick = onClick)
+            .padding(start = CODE_GAP, end = 2.dp, top = 4.dp, bottom = 6.dp)
+            .semantics { contentDescription = description },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text = currency.code, style = CambioTextStyles.CurrencyCode, color = codeColor)
+        Icon(
+            imageVector = Icons.Rounded.UnfoldMore,
+            contentDescription = null,
+            tint = codeColor,
             modifier = Modifier
-                .clip(RoundedCornerShape(ROW_RADIUS))
-                .clickable(onClick = onPickCurrency)
-                .padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 4.dp)
-                .semantics { contentDescription = pickDescription },
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            Text(
-                text = currency.code,
-                style = CambioTextStyles.CurrencyCode,
-                color = colors.textSecondary,
-                modifier = Modifier.padding(bottom = 3.dp),
-            )
-            Icon(
-                imageVector = Icons.Rounded.UnfoldMore,
-                contentDescription = null,
-                tint = colors.accentText,
-                modifier = Modifier
-                    .padding(start = 2.dp, bottom = 2.dp)
-                    .size(CHEVRON_SIZE),
-            )
-        }
+                .padding(start = 2.dp)
+                .size(CHEVRON_SIZE),
+        )
     }
 }
 
 /**
- * The swap control, sitting on the rule between the two rows.
+ * The swap control, sitting on the rule between the two figures.
  *
  * Rotates a half-turn on each press so the reversal is felt, not merely inferred
  * from the two figures trading places.
@@ -214,7 +353,6 @@ private fun SwapButton(onClick: () -> Unit) {
 
     Box(
         modifier = Modifier
-            // A full 48dp target even though the glyph is small.
             .size(TOUCH_TARGET)
             .clip(CircleShape)
             .clickable {
@@ -234,13 +372,37 @@ private fun SwapButton(onClick: () -> Unit) {
     }
 }
 
-/** Shown in place of the converted figure until rates are available. */
-private const val PLACEHOLDER = "—"
+/**
+ * Largest size that keeps the active figure on one line.
+ *
+ * Shrinking rather than clipping is the point: a fourteen-digit figure has to stay
+ * readable, because a calculator that hides the front of your number is useless.
+ */
+private fun heroSizeFor(length: Int): Float = when {
+    length <= 8 -> 52f
+    length <= 10 -> 46f
+    length <= 12 -> 40f
+    length <= 15 -> 34f
+    length <= 18 -> 29f
+    length <= 22 -> 25f
+    else -> 21f
+}
+
+/** The idle figure runs a step behind the active one. */
+private fun idleSizeFor(length: Int): Float = (heroSizeFor(length) * IDLE_RATIO).coerceAtLeast(16f)
+
+private const val IDLE_RATIO = 0.74f
+private const val SELECTION_ALPHA = 0.3f
+private const val CARET_PERIOD_MILLIS = 1000
+private const val HALF_TURN_DEGREES = 180f
+private const val SWAP_MILLIS = 320
+private const val ACTIVATE_MILLIS = 180
+private const val RESIZE_MILLIS = 140
 
 private val ROW_RADIUS = 10.dp
 private val CHEVRON_SIZE = 18.dp
 private val SWAP_ICON_SIZE = 24.dp
 private val TOUCH_TARGET = 48.dp
-private const val HALF_TURN_DEGREES = 180f
-private const val SWAP_MILLIS = 320
-private const val ACTIVATE_MILLIS = 180
+private val CARET_WIDTH = 2.5.dp
+private val CODE_GAP = 10.dp
+private val CODE_COLUMN = 56.dp

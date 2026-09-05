@@ -87,16 +87,24 @@ private class KeyGlowNode(private val interactionSource: InteractionSource, priv
     }
 
     private companion object {
-        const val FADE_IN_MILLIS = 90
-        const val FADE_OUT_MILLIS = 340
+        const val FADE_IN_MILLIS = 60
+
+        /**
+         * Short on purpose. At 340ms consecutive presses overlapped and left two or
+         * three keys glowing at once, which read as smearing rather than feedback.
+         */
+        const val FADE_OUT_MILLIS = 160
 
         /** How far past the key's radius the halo reaches. */
-        const val HALO_SCALE = 1.32f
+        const val HALO_SCALE = 1.16f
 
-        /** Where the gradient starts brightening, as a fraction of the key edge. */
-        const val INNER_STOP = 0.55f
+        /**
+         * Where the gradient starts brightening. Close to the edge, so the light
+         * reads as a thin rim hugging the key rather than a soft cloud over it.
+         */
+        const val INNER_STOP = 0.82f
 
-        const val CENTRE_ALPHA = 0.05f
-        const val PEAK_ALPHA = 0.34f
+        const val CENTRE_ALPHA = 0.0f
+        const val PEAK_ALPHA = 0.30f
     }
 }
