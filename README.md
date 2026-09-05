@@ -32,9 +32,9 @@ same engine and the same theme.
 | :---: | :---: | :---: |
 | ![Calculator in dark theme showing 1,250 + 15% = 1,437.5 converted to EUR](docs/screenshots/01-dark-calculation.png) | ![Searchable currency picker listing world currencies with flags and live rates](docs/screenshots/02-dark-currency-picker.png) | ![Settings sheet with theme options and rate provider attribution](docs/screenshots/03-dark-settings.png) |
 
-| Calculator (light) | Home-screen widget |
-| :---: | :---: |
-| ![Calculator in light theme](docs/screenshots/04-light-calculation.png) | ![Home screen widget showing the same calculator](docs/screenshots/05-widget.png) |
+| Home-screen widget |
+| :---: |
+| ![Home screen widget showing the same calculator](docs/screenshots/05-widget.png) |
 
 *Screenshots captured from the app running on a Pixel 10 Pro XL emulator.*
 
