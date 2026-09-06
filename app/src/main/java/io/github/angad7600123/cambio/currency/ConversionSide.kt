@@ -13,7 +13,4 @@ enum class ConversionSide {
 
     /** The lower figure in the app, the right one in the widget. */
     TARGET,
-    ;
-
-    fun opposite(): ConversionSide = if (this == SOURCE) TARGET else SOURCE
 }

@@ -66,3 +66,12 @@ internal val LightAccent = Color(0xFF0F6E56)
 internal val LightAccentPressed = Color(0xFF0B5643)
 internal val LightOnAccent = Color(0xFFFFFFFF)
 internal val LightOutline = Color(0xFFE2E2E7)
+
+/**
+ * The index scrubber's drop, sampled from the One UI contacts index.
+ *
+ * A fallback only: on Android 12 and up the drop takes the platform's own accent so
+ * it follows whatever theme is applied, exactly as One UI's does. This is what it
+ * falls back to on older releases, which expose no dynamic accent to read.
+ */
+internal val OneUiIndexBlue = Color(0xFF2B59B6)

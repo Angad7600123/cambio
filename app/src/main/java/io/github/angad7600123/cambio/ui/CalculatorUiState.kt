@@ -1,7 +1,6 @@
 package io.github.angad7600123.cambio.ui
 
 import androidx.compose.runtime.Immutable
-import io.github.angad7600123.cambio.calculator.CalcError
 import io.github.angad7600123.cambio.currency.ConversionSide
 import io.github.angad7600123.cambio.currency.CurrencyInfo
 import io.github.angad7600123.cambio.data.HistoryEntry
@@ -61,7 +60,7 @@ data class CalculatorUiState(
      * A transient failure to surface as a toast. One UI does not blank the display
      * on a bad expression, it floats a brief message and leaves the input intact.
      */
-    val transientError: CalcError? = null,
+    val transientMessage: TransientMessage? = null,
     val fromCurrency: CurrencyInfo,
     val toCurrency: CurrencyInfo,
     val rateDisplay: String? = null,

@@ -81,7 +81,7 @@ class CalculatorScreenTest {
                     onClearHistory = {},
                     onThemeModeChange = {},
                     onUseSystemColorsChange = {},
-                    onTransientErrorShown = {},
+                    onTransientMessageShown = {},
                 )
             }
         }
@@ -173,7 +173,7 @@ class CalculatorScreenTest {
                     onClearHistory = {},
                     onThemeModeChange = {},
                     onUseSystemColorsChange = {},
-                    onTransientErrorShown = {},
+                    onTransientMessageShown = {},
                 )
             }
         }
@@ -327,7 +327,7 @@ class CalculatorScreenTest {
         // rather than blanking the display.
         setScreen(
             state(activeText = "5/0").copy(
-                transientError = io.github.angad7600123.cambio.calculator.CalcError.DIVIDE_BY_ZERO,
+                transientMessage = TransientMessage.DIVIDE_BY_ZERO,
             ),
         )
 

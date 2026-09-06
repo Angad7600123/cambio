@@ -57,7 +57,12 @@ into.
   everything runs on `BigDecimal`, never binary floating point
 - Chained calculations, backspace and clear
 - **The expression leads while you type** and steps back once evaluated. Operators
-  are tinted, a caret marks your place, and each new character pops in
+  are tinted, each new character eases in, and a caret marks your place — with the
+  platform's own drag handle beneath it, so you can slide the caret through a long
+  figure. The soft keyboard never appears; the keypad is the only way in
+- **The figure is measured, not guessed.** Type size steps down twice to keep a long
+  number whole, fitted against the box the screen actually gives it. Past fifteen
+  digits a brief message says so, rather than the keypad going quietly dead
 - An incomplete expression floats a brief message and **leaves your input alone**,
   rather than blanking the display
 - Numbers beyond `Long` range, with scientific notation past `1e16`
@@ -66,11 +71,12 @@ into.
 
 - 160+ currencies, live rates
 - **Convert in either direction.** Tap either figure to move the caret to that
-  currency and type there; the other side follows. The active figure is the bright
-  one, the idle one greys out. Values carry across when you switch, so nothing is
-  lost
+  currency and type there; the other side follows. Neither figure moves — the
+  active one is simply the bright one and the idle one greys out. Values carry
+  across when you switch, so nothing is lost
 - Swap direction with one tap; searchable picker by code *or* name, with recents
-  pinned, an A–Z scrubber with a letter bubble, and each row previewing its rate
+  pinned, an index scrubber whose letter drop is pulled out of the rail and falls
+  back into it, and each row previewing its rate
 - Amounts rounded to each currency's real minor units — 2 for USD, **0 for JPY**,
   **3 for KWD** — escalating precision so a tiny amount never renders as a
   misleading `0.00`

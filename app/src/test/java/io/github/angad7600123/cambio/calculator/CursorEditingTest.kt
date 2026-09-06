@@ -104,6 +104,31 @@ class CursorEditingTest {
     }
 
     @Test
+    fun `the digit count at the caret spans the whole number`() {
+        assertEquals(4, CalculatorInput.digitsAtCaret(at("1234", 2)))
+    }
+
+    @Test
+    fun `the digit count ignores separators and other operands`() {
+        // Only the literal around the caret counts, and its decimal point is free.
+        assertEquals(3, CalculatorInput.digitsAtCaret(at("9999+1.23", 9)))
+    }
+
+    @Test
+    fun `a fresh calculation counts no digits`() {
+        // After equals a digit starts over, so the result's own length must not
+        // count against the cap — otherwise a long answer locks the keypad.
+        val evaluated = InputState("123456789012345", 15, justEvaluated = true)
+        assertEquals(0, CalculatorInput.digitsAtCaret(evaluated))
+    }
+
+    @Test
+    fun `the digit count reports the cap when the number is full`() {
+        val full = "9".repeat(CalculatorInput.MAX_DIGITS_PER_NUMBER)
+        assertEquals(CalculatorInput.MAX_DIGITS_PER_NUMBER, CalculatorInput.digitsAtCaret(at(full, 7)))
+    }
+
+    @Test
     fun `correcting a digit mid-number keeps the rest intact`() {
         // "12345678901234" with a wrong digit at index 4: delete it and type the
         // right one, without touching the nine digits that follow.

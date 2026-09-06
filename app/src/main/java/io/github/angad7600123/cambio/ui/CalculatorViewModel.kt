@@ -2,7 +2,6 @@ package io.github.angad7600123.cambio.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.angad7600123.cambio.calculator.CalcError
 import io.github.angad7600123.cambio.calculator.CalcResult
 import io.github.angad7600123.cambio.calculator.CalculatorEngine
 import io.github.angad7600123.cambio.calculator.CalculatorInput
@@ -67,7 +66,7 @@ class CalculatorViewModel(
      * than blanking the display, so this is deliberately *not* part of the input
      * state — the typed expression survives untouched.
      */
-    private val transientError = MutableStateFlow<CalcError?>(null)
+    private val transientMessage = MutableStateFlow<TransientMessage?>(null)
 
     /**
      * Which currency the keypad is typing into.
@@ -78,7 +77,7 @@ class CalculatorViewModel(
     private val activeSide = MutableStateFlow(ConversionSide.SOURCE)
 
     val uiState: StateFlow<CalculatorUiState> = combine(
-        combine(inputState, evaluatedExpression, transientError, activeSide, ::Quad),
+        combine(inputState, evaluatedExpression, transientMessage, activeSide, ::Quad),
         settingsRepository.settings,
         ratesRepository.snapshot,
         ratesRepository.refreshState,
@@ -105,7 +104,16 @@ class CalculatorViewModel(
             return
         }
 
-        transientError.value = null
+        transientMessage.value = null
+
+        // A refused digit has to say so. Silence there reads as a dead keypad: the
+        // number simply stops growing with no indication that a rule was applied.
+        if (key is CalculatorKey.Digit &&
+            CalculatorInput.digitsAtCaret(before) >= CalculatorInput.MAX_DIGITS_PER_NUMBER
+        ) {
+            transientMessage.value = TransientMessage.DIGIT_LIMIT
+            return
+        }
 
         // Any other key leaves the "showing a finished result" mode.
         if (before.justEvaluated || before.error != null) {
@@ -119,7 +127,7 @@ class CalculatorViewModel(
 
         if (after.error != null) {
             // Keep exactly what the user typed; only float a message about it.
-            transientError.value = after.error
+            transientMessage.value = TransientMessage.of(after.error)
             return
         }
 
@@ -177,8 +185,8 @@ class CalculatorViewModel(
     }
 
     /** Called once the toast has been shown for its duration. */
-    fun onTransientErrorShown() {
-        transientError.value = null
+    fun onTransientMessageShown() {
+        transientMessage.value = null
     }
 
     fun onSwapCurrencies() {
@@ -282,13 +290,11 @@ class CalculatorViewModel(
             activeText = input.expression,
             activeCursor = input.cursor,
             // The running total is shown only when it says something the line above
-            // does not: not for an empty field, and not when it would merely repeat
-            // the figure already displayed.
-            activePreview = if (
-                isEditing &&
-                input.expression.isNotEmpty() &&
-                previewText != groupingOf(input.expression)
-            ) {
+            // does not: not for an empty field, and not when the expression is just a
+            // number, whose "result" is itself. The comparison has to be numeric —
+            // matching the formatted strings let "7566.6400" through against a
+            // preview of "7,566.64", printing the same figure twice.
+            activePreview = if (isEditing && input.expression.isNotEmpty() && !isBareNumber(input.expression, value)) {
                 previewText
             } else {
                 ""
@@ -300,7 +306,7 @@ class CalculatorViewModel(
                 ?.let { numberFormatter.formatMoney(it, otherCurrency) }
                 ?: PLACEHOLDER,
             activeSide = side,
-            transientError = transientError.value,
+            transientMessage = transientMessage.value,
             fromCurrency = from,
             toCurrency = to,
             rateDisplay = rateDisplay(settings, snapshot, from, to),
@@ -313,12 +319,6 @@ class CalculatorViewModel(
             useSystemColors = settings.useSystemColors,
         )
     }
-
-    /**
-     * The expression as it will appear once grouped, used only to decide whether the
-     * running total would be a duplicate of it.
-     */
-    private fun groupingOf(expression: String): String = expressionFormatter.format(expression)
 
     /** Converts between two currencies, or null when rates are not yet available. */
     private fun convertBetween(

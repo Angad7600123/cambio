@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -82,6 +83,33 @@ internal val LightCambioColors = CambioColors(
 )
 
 val LocalCambioColors = staticCompositionLocalOf { DarkCambioColors }
+
+/**
+ * The colour of the currency picker's index drop.
+ *
+ * Read from the platform rather than from the app's palette. One UI tints this
+ * element with the device accent, so on a themed phone the drop matches the rest of
+ * the system even though Cambio's own palette is jade. Devices below Android 12
+ * expose no dynamic accent and fall back to the tone measured from the reference.
+ *
+ * The *light* scheme's primary is used in both themes, deliberately. A dark scheme's
+ * primary is a pale tint meant to be legible **on** a dark surface, and taking it
+ * produced a washed-out lavender drop with black lettering — nothing like One UI's
+ * saturated blue. The light scheme's primary is the accent at full strength, which
+ * is the tone One UI actually fills this shape with.
+ */
+@Composable
+fun rememberIndexBubbleColor(): Color {
+    val context = LocalContext.current
+
+    return remember(context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            dynamicLightColorScheme(context).primary
+        } else {
+            OneUiIndexBlue
+        }
+    }
+}
 
 /**
  * Applies the Cambio theme.

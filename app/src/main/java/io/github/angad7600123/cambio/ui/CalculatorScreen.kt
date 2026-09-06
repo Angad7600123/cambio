@@ -31,7 +31,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.angad7600123.cambio.R
-import io.github.angad7600123.cambio.calculator.CalcError
 import io.github.angad7600123.cambio.calculator.CalculatorKey
 import io.github.angad7600123.cambio.currency.ConversionSide
 import io.github.angad7600123.cambio.data.HistoryEntry
@@ -82,7 +81,7 @@ fun CalculatorScreen(
     onClearHistory: () -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
     onUseSystemColorsChange: (Boolean) -> Unit,
-    onTransientErrorShown: () -> Unit,
+    onTransientMessageShown: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = CambioTheme.colors
@@ -121,8 +120,8 @@ fun CalculatorScreen(
         }
 
         CalcToast(
-            message = state.transientError?.let { stringResource(it.messageRes()) },
-            onDismiss = onTransientErrorShown,
+            message = state.transientMessage?.let { stringResource(it.messageRes()) },
+            onDismiss = onTransientMessageShown,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = TOAST_BOTTOM_INSET),
@@ -309,6 +308,10 @@ private fun TopBar(onHistoryClick: () -> Unit, onSettingsClick: () -> Unit, modi
 /**
  * The display stack: the converter block, which is also the primary display, and
  * the rate line beneath it.
+ *
+ * Centred rather than bottom-aligned. Anchoring the stack to the keypad left the
+ * whole upper half of the screen empty on a tall phone, which read as a rendering
+ * fault rather than as breathing room.
  */
 @Composable
 private fun DisplaySection(
@@ -322,7 +325,7 @@ private fun DisplaySection(
 ) {
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.Bottom,
+        verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.End,
     ) {
         ConverterBlock(
@@ -361,12 +364,13 @@ private fun formatUpdatedAt(epochSeconds: Long): String = DateFormat.getDateInst
     ),
 )
 
-/** Each calculator failure gets its own message rather than a generic "Error". */
-private fun CalcError.messageRes(): Int = when (this) {
-    CalcError.EMPTY -> R.string.calc_error_empty
-    CalcError.MALFORMED -> R.string.calc_error_malformed
-    CalcError.DIVIDE_BY_ZERO -> R.string.calc_error_divide_by_zero
-    CalcError.OVERFLOW -> R.string.calc_error_overflow
+/** Each failure gets its own message rather than a generic "Error". */
+private fun TransientMessage.messageRes(): Int = when (this) {
+    TransientMessage.EMPTY -> R.string.calc_error_empty
+    TransientMessage.MALFORMED -> R.string.calc_error_malformed
+    TransientMessage.DIVIDE_BY_ZERO -> R.string.calc_error_divide_by_zero
+    TransientMessage.OVERFLOW -> R.string.calc_error_overflow
+    TransientMessage.DIGIT_LIMIT -> R.string.calc_error_digit_limit
 }
 
 private val SCREEN_PADDING = 24.dp

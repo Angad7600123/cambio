@@ -50,6 +50,19 @@ object CalculatorInput {
     /** Digits allowed in a single number literal, matching typical pocket calculators. */
     const val MAX_DIGITS_PER_NUMBER = 15
 
+    /**
+     * Digits already in the number the caret sits in, counted exactly as a digit
+     * press would count them.
+     *
+     * Exposed so the UI can say *why* a keypress did nothing. Inferring it from an
+     * unchanged expression does not work: pressing `0` on a lone `0` is also a
+     * no-op, and reporting a digit limit there would be a lie.
+     */
+    fun digitsAtCaret(state: InputState): Int {
+        val base = if (state.justEvaluated || state.error != null) InputState.Empty else state
+        return numberDigitsAround(base)
+    }
+
     fun press(state: InputState, key: CalculatorKey): InputState = when (key) {
         is CalculatorKey.Digit -> insertDigit(state, key.value)
         is CalculatorKey.Operator -> insertOperator(state, key.type)

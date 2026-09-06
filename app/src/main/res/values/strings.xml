@@ -35,6 +35,7 @@
     <string name="calc_error_malformed">Invalid expression</string>
     <string name="calc_error_divide_by_zero">Cannot divide by zero</string>
     <string name="calc_error_overflow">Number too large</string>
+    <string name="calc_error_digit_limit">Can’t enter more than 15 digits</string>
     <string name="calc_error_short">Error</string>
 
     <!-- Rates -->

@@ -1,14 +1,10 @@
 package io.github.angad7600123.cambio.ui.components
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.keyframes
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,9 +12,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material.icons.Icons
@@ -31,21 +27,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.InterceptPlatformTextInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
@@ -57,23 +52,30 @@ import io.github.angad7600123.cambio.currency.CurrencyInfo
 import io.github.angad7600123.cambio.format.NumberDisplayFormatter
 import io.github.angad7600123.cambio.ui.theme.CambioTextStyles
 import io.github.angad7600123.cambio.ui.theme.CambioTheme
+import kotlinx.coroutines.awaitCancellation
 
 /**
  * The conversion block, and the app's primary display.
  *
- * The active currency's figure *is* the big line — it is not a separate small row
- * beneath an empty display. That single decision is what keeps the caret attached
- * to the number you are typing, lets the type shrink to fit a long figure, and
- * removes the empty band that otherwise sits above everything.
+ * Two figures with a rule between them, following the iOS converter: the source
+ * currency on top, the target beneath, each paired with its code. The figure you are
+ * typing into *is* the big line — it is not a separate small row under an empty
+ * display — which is what keeps the caret attached to the number being edited.
  *
- * Structurally it follows the iOS converter: two figures, each paired with its
- * currency code, a rule between them and the swap control on the rule. The active
- * figure is an editable field, so the caret can be placed anywhere in it and digits
- * inserted mid-number; the idle figure is plain text.
+ * **The rows never move.** Whichever side is active, the source stays above the rule
+ * and the target below it; activating the other side changes only which figure is
+ * lit and where the caret sits. An earlier version promoted the active side to the
+ * top, so tapping a figure made both it and its currency appear to jump across the
+ * screen — the numbers looked like they had swapped when nothing had.
+ *
+ * The swap control lives *on* the rule rather than in a column beside the figures.
+ * As a sibling it stole its own width from both rows for its whole height, and long
+ * figures ran underneath it and were clipped. On the rule it costs the figures
+ * nothing, so they run the full width of the screen.
  *
  * @param activeText the raw expression being typed, in the active currency.
- * @param activePreview the running total, shown small only when an operation is in
- *   progress and it would not merely repeat [activeText].
+ * @param activePreview the running total, shown small beneath the active figure only
+ *   when an operation is in progress.
  * @param evaluatedExpression the expression that produced the current result, shown
  *   above after equals.
  */
@@ -95,8 +97,7 @@ fun ConverterBlock(
     modifier: Modifier = Modifier,
 ) {
     val colors = CambioTheme.colors
-    val activeCurrency = if (activeSide == ConversionSide.SOURCE) from else to
-    val idleCurrency = if (activeSide == ConversionSide.SOURCE) to else from
+    val sourceActive = activeSide == ConversionSide.SOURCE
 
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
         // Only present after equals, where One UI puts the expression that produced
@@ -112,194 +113,248 @@ fun ConverterBlock(
             )
         }
 
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            SwapButton(onClick = onSwapClick)
+        FigureRow(
+            text = if (sourceActive) activeText else otherValue,
+            cursor = activeCursor,
+            currency = from,
+            isActive = sourceActive,
+            onCursorChange = onCursorChange,
+            onActivate = { onSelectSide(ConversionSide.SOURCE) },
+            onPickCurrency = onFromClick,
+        )
 
-            Column(modifier = Modifier.weight(1f)) {
-                ActiveRow(
-                    text = activeText,
-                    cursor = activeCursor,
-                    currency = activeCurrency,
-                    onCursorChange = onCursorChange,
-                    onPickCurrency = if (activeSide == ConversionSide.SOURCE) onFromClick else onToClick,
-                )
+        if (sourceActive) {
+            PreviewLine(activePreview)
+        }
 
-                if (activePreview.isNotEmpty()) {
-                    Text(
-                        text = activePreview,
-                        style = CambioTextStyles.Secondary,
-                        color = colors.textSecondary,
-                        maxLines = 1,
-                        textAlign = TextAlign.End,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(end = CODE_COLUMN),
-                    )
-                }
+        SwapRule(onSwapClick = onSwapClick)
 
-                HorizontalDivider(
-                    color = colors.outline,
-                    modifier = Modifier.padding(vertical = 8.dp),
-                )
+        FigureRow(
+            text = if (sourceActive) otherValue else activeText,
+            cursor = activeCursor,
+            currency = to,
+            isActive = !sourceActive,
+            onCursorChange = onCursorChange,
+            onActivate = { onSelectSide(ConversionSide.TARGET) },
+            onPickCurrency = onToClick,
+        )
 
-                IdleRow(
-                    value = otherValue,
-                    currency = idleCurrency,
-                    onActivate = { onSelectSide(activeSide.opposite()) },
-                    onPickCurrency = if (activeSide == ConversionSide.SOURCE) onToClick else onFromClick,
-                )
-            }
+        if (!sourceActive) {
+            PreviewLine(activePreview)
         }
     }
 }
 
 /**
- * The figure being typed into, and the app's largest element.
+ * One of the two figures.
  *
- * A [BasicTextField] rather than a Text, so the caret can be placed anywhere in the
- * number and digits inserted mid-string — the thing a plain read-only display
- * cannot do.
+ * Active and inactive are the same row rather than two composables, so the two can
+ * never drift apart in size, alignment or spacing. Which one is live is carried
+ * entirely by colour — the primary tone against the secondary — as One UI does it;
+ * an earlier attempt outlined the active figure, which fought the flat display.
  *
- * The field is `readOnly`, which keeps the system keyboard away and blocks IME
- * edits while still letting a tap position the caret. Compose does not paint a
- * caret for a read-only field, so one is drawn here from the text layout: that is
- * the only way to have both a visible caret and no keyboard.
+ * The active figure is a text field so the caret can be placed inside it. The
+ * inactive one is plain text, tappable to become the active one.
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun ActiveRow(
+private fun FigureRow(
     text: String,
     cursor: Int,
     currency: CurrencyInfo,
+    isActive: Boolean,
     onCursorChange: (Int) -> Unit,
+    onActivate: () -> Unit,
     onPickCurrency: () -> Unit,
 ) {
     val colors = CambioTheme.colors
     val formatter = remember { NumberDisplayFormatter() }
 
-    // Each new character lands small and grows, as One UI's does. Scaling is applied
-    // inside the transformation so only the newest glyph moves.
-    val entryScale = rememberEntryScale(text)
+    // Each new character eases in, as One UI's does. The scale is applied inside the
+    // transformation so only the newest glyph moves, not the whole figure.
+    val typedScale = rememberEntryScale(text)
+    val entryScale = if (isActive) typedScale else 1f
     val transformation = remember(colors.accentText, entryScale) {
         ExpressionTransformation.forLocale(colors.accentText, formatter, entryScale)
     }
-    val transformed = remember(text, transformation) { transformation.filter(AnnotatedString(text)) }
 
-    val target = remember(transformed.text.length) { heroSizeFor(transformed.text.length) }
+    // The active figure holds a raw expression that the transformation formats for
+    // display; the inactive one arrives already formatted from the view model, so it
+    // is measured and drawn exactly as given.
+    val displayed = remember(text, transformation, isActive) {
+        if (isActive) transformation.filter(AnnotatedString(text)).text.text else text
+    }
+
+    // The figure's own box, measured rather than assumed — this is what the type
+    // size is fitted against, so the same code lands correctly on any screen width.
+    var fieldWidthPx by remember { mutableIntStateOf(0) }
+    val baseStyle = CambioTextStyles.Display
+    val fitted = rememberFittedSize(
+        text = displayed,
+        style = baseStyle,
+        maxWidthPx = fieldWidthPx,
+        sizes = if (isActive) FigureSizes else IdleFigureSizes,
+    )
     val animatedSize by animateFloatAsState(
-        targetValue = target,
+        targetValue = fitted.value,
         animationSpec = tween(durationMillis = RESIZE_MILLIS),
-        label = "heroFontSize",
+        label = "figureFontSize",
     )
 
-    // A square-wave blink, matching a text caret rather than a smooth pulse.
-    val blinkTransition = rememberInfiniteTransition(label = "caret")
-    val caretAlpha by blinkTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = keyframes {
-                durationMillis = CARET_PERIOD_MILLIS
-                1f at 0
-                1f at CARET_PERIOD_MILLIS / 2
-                0f at CARET_PERIOD_MILLIS / 2 + 1
-                0f at CARET_PERIOD_MILLIS
-            },
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "caretAlpha",
+    val textColor by animateColorAsState(
+        targetValue = if (isActive) colors.textPrimary else colors.textSecondary,
+        animationSpec = tween(durationMillis = ACTIVATE_MILLIS),
+        label = "figureColor",
     )
 
-    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     val caretColor = colors.accentText
     val selectionColors = TextSelectionColors(
         handleColor = caretColor,
         backgroundColor = caretColor.copy(alpha = SELECTION_ALPHA),
     )
+    val style = baseStyle.copy(
+        fontSize = animatedSize.sp,
+        color = textColor,
+        textAlign = TextAlign.End,
+    )
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Bottom,
         horizontalArrangement = Arrangement.End,
     ) {
-        CompositionLocalProvider(LocalTextSelectionColors provides selectionColors) {
-            BasicTextField(
-                value = TextFieldValue(
-                    text = text,
-                    selection = TextRange(cursor.coerceIn(0, text.length)),
-                ),
-                // Only the caret can move from here; the text itself is owned by the
-                // calculator state and changed exclusively by the keypad.
-                onValueChange = { onCursorChange(it.selection.start) },
-                readOnly = true,
-                singleLine = true,
-                visualTransformation = transformation,
-                onTextLayout = { layout = it },
-                textStyle = CambioTextStyles.Display.copy(
-                    fontSize = animatedSize.sp,
-                    color = colors.textPrimary,
-                    textAlign = TextAlign.End,
-                ),
-                modifier = Modifier
-                    .weight(1f)
-                    .drawWithContent {
-                        drawContent()
-                        val result = layout ?: return@drawWithContent
-                        if (caretAlpha <= 0f) return@drawWithContent
-
-                        // The layout describes the *transformed* string, so the caret
-                        // has to be mapped out of the raw expression first.
-                        val offset = transformed.offsetMapping
-                            .originalToTransformed(cursor.coerceIn(0, text.length))
-                            .coerceIn(0, result.layoutInput.text.length)
-                        val rect = result.getCursorRect(offset)
-
-                        drawLine(
-                            color = caretColor.copy(alpha = caretAlpha),
-                            start = Offset(rect.left, rect.top),
-                            end = Offset(rect.left, rect.bottom),
-                            strokeWidth = CARET_WIDTH.toPx(),
-                            cap = StrokeCap.Round,
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .onSizeChanged { fieldWidthPx = it.width },
+            contentAlignment = Alignment.BottomEnd,
+        ) {
+            if (isActive) {
+                CompositionLocalProvider(LocalTextSelectionColors provides selectionColors) {
+                    // Never let a text input session start. This is what keeps the
+                    // soft keyboard away while the field stays fully editable, and
+                    // an editable field is the only kind the platform gives a caret
+                    // and a drag handle to. `showKeyboardOnFocus` alone is not
+                    // enough: it covers focus, but tapping an already-focused field
+                    // asks for the keyboard again, and it duly appeared.
+                    InterceptPlatformTextInput(interceptor = { _, _ -> awaitCancellation() }) {
+                        BasicTextField(
+                            value = TextFieldValue(
+                                text = text,
+                                selection = TextRange(cursor.coerceIn(0, text.length)),
+                            ),
+                            // The field is editable so the platform draws its caret and
+                            // the drag handle beneath it; every actual edit is rejected
+                            // below, leaving the keypad as the only way to change the
+                            // text. Making it read-only instead is what suppressed the
+                            // handle, since a read-only field has nothing to insert at.
+                            onValueChange = { new ->
+                                if (new.text == text) onCursorChange(new.selection.start)
+                            },
+                            // Belt and braces with the interceptor above: this
+                            // stops the request being made at all on focus, rather
+                            // than making it and refusing to serve it.
+                            keyboardOptions = KeyboardOptions(showKeyboardOnFocus = false),
+                            singleLine = true,
+                            visualTransformation = transformation,
+                            cursorBrush = SolidColor(caretColor),
+                            textStyle = style,
+                            modifier = Modifier.fillMaxWidth(),
                         )
-                    },
-            )
+                    }
+                }
+            } else {
+                val description = stringResource(R.string.cd_side_inactive, currency.displayName)
+                Text(
+                    text = text,
+                    style = style,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(ROW_RADIUS))
+                        .clickable(onClick = onActivate)
+                        .semantics { contentDescription = description },
+                )
+            }
         }
 
-        CurrencyControl(currency = currency, onClick = onPickCurrency, isActive = true)
+        CurrencyControl(currency = currency, onClick = onPickCurrency, isActive = isActive)
     }
 }
 
-/** The other currency: plain text, tappable to move the caret to it. */
+/** The running total under the active figure, when it says more than the figure does. */
 @Composable
-private fun IdleRow(value: String, currency: CurrencyInfo, onActivate: () -> Unit, onPickCurrency: () -> Unit) {
-    val colors = CambioTheme.colors
-    val target = remember(value.length) { idleSizeFor(value.length) }
-    val animatedSize by animateFloatAsState(
-        targetValue = target,
-        animationSpec = tween(durationMillis = RESIZE_MILLIS),
-        label = "idleFontSize",
+private fun PreviewLine(preview: String) {
+    if (preview.isEmpty()) return
+
+    Text(
+        text = preview,
+        style = CambioTextStyles.Secondary,
+        color = CambioTheme.colors.textSecondary,
+        maxLines = 1,
+        textAlign = TextAlign.End,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(end = CODE_COLUMN),
     )
-    val description = stringResource(R.string.cd_side_inactive, currency.displayName)
+}
+
+/**
+ * The rule between the two figures, with the swap control at its left end.
+ *
+ * The arrows are a bare glyph on a transparent touch target: a filled circle here
+ * would read as a third element competing with the two figures, when all this does
+ * is reverse them. The rule starts where the glyph ends so the two read as one
+ * piece of furniture rather than as a line with something parked on it.
+ */
+@Composable
+private fun SwapRule(onSwapClick: () -> Unit) {
+    val colors = CambioTheme.colors
+    var turns by remember { mutableIntStateOf(0) }
+
+    val rotation by animateFloatAsState(
+        targetValue = turns * HALF_TURN_DEGREES,
+        animationSpec = tween(durationMillis = SWAP_MILLIS),
+        label = "swapRotation",
+    )
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.End,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = RULE_GAP),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = value,
-            style = CambioTextStyles.Display.copy(fontSize = animatedSize.sp),
-            color = colors.textSecondary,
-            maxLines = 1,
-            textAlign = TextAlign.End,
+        Box(
+            modifier = Modifier
+                // Sized to the glyph, not to a 48dp target. A padded target held the
+                // arrows a finger's width in from the margin, which is the gap that
+                // made the control look unaligned with everything below it.
+                .size(SWAP_ICON_SIZE)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) {
+                    turns++
+                    onSwapClick()
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.SwapVert,
+                contentDescription = stringResource(R.string.cd_swap_currencies),
+                tint = colors.accentText,
+                modifier = Modifier
+                    .size(SWAP_ICON_SIZE)
+                    .rotate(rotation),
+            )
+        }
+
+        HorizontalDivider(
+            color = colors.outline,
             modifier = Modifier
                 .weight(1f)
-                .clip(RoundedCornerShape(ROW_RADIUS))
-                .clickable(onClick = onActivate)
-                .padding(vertical = 2.dp)
-                .semantics { contentDescription = description },
+                .padding(start = RULE_GAP),
         )
-
-        CurrencyControl(currency = currency, onClick = onPickCurrency, isActive = false)
     }
 }
 
@@ -334,66 +389,7 @@ private fun CurrencyControl(currency: CurrencyInfo, onClick: () -> Unit, isActiv
     }
 }
 
-/**
- * The swap control, sitting on the rule between the two figures.
- *
- * Rotates a half-turn on each press so the reversal is felt, not merely inferred
- * from the two figures trading places.
- */
-@Composable
-private fun SwapButton(onClick: () -> Unit) {
-    val colors = CambioTheme.colors
-    var turns by remember { mutableIntStateOf(0) }
-
-    val rotation by animateFloatAsState(
-        targetValue = turns * HALF_TURN_DEGREES,
-        animationSpec = tween(durationMillis = SWAP_MILLIS),
-        label = "swapRotation",
-    )
-
-    Box(
-        modifier = Modifier
-            .size(TOUCH_TARGET)
-            .clip(CircleShape)
-            .clickable {
-                turns++
-                onClick()
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = Icons.Rounded.SwapVert,
-            contentDescription = stringResource(R.string.cd_swap_currencies),
-            tint = colors.accentText,
-            modifier = Modifier
-                .size(SWAP_ICON_SIZE)
-                .rotate(rotation),
-        )
-    }
-}
-
-/**
- * Largest size that keeps the active figure on one line.
- *
- * Shrinking rather than clipping is the point: a fourteen-digit figure has to stay
- * readable, because a calculator that hides the front of your number is useless.
- */
-private fun heroSizeFor(length: Int): Float = when {
-    length <= 8 -> 52f
-    length <= 10 -> 46f
-    length <= 12 -> 40f
-    length <= 15 -> 34f
-    length <= 18 -> 29f
-    length <= 22 -> 25f
-    else -> 21f
-}
-
-/** The idle figure runs a step behind the active one. */
-private fun idleSizeFor(length: Int): Float = (heroSizeFor(length) * IDLE_RATIO).coerceAtLeast(16f)
-
-private const val IDLE_RATIO = 0.74f
 private const val SELECTION_ALPHA = 0.3f
-private const val CARET_PERIOD_MILLIS = 1000
 private const val HALF_TURN_DEGREES = 180f
 private const val SWAP_MILLIS = 320
 private const val ACTIVATE_MILLIS = 180
@@ -402,7 +398,6 @@ private const val RESIZE_MILLIS = 140
 private val ROW_RADIUS = 10.dp
 private val CHEVRON_SIZE = 18.dp
 private val SWAP_ICON_SIZE = 24.dp
-private val TOUCH_TARGET = 48.dp
-private val CARET_WIDTH = 2.5.dp
+private val RULE_GAP = 8.dp
 private val CODE_GAP = 10.dp
 private val CODE_COLUMN = 56.dp
