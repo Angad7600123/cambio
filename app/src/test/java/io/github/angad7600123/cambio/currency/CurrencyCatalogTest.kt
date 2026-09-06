@@ -4,13 +4,16 @@ import org.junit.Test
 import java.util.Locale
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
  * Tests for currency metadata resolution.
  *
  * The catalog reads the platform's ISO 4217 data, so these assert the mapping and
- * the fallback behaviour rather than a hand-maintained table of names.
+ * the fallback behaviour rather than a hand-maintained table of names. The
+ * supplementary table is the exception, and is tested for being a *fallback* — it
+ * must fill gaps without displacing a name the platform already gives.
  */
 class CurrencyCatalogTest {
 
@@ -81,4 +84,113 @@ class CurrencyCatalogTest {
 
     @Test
     fun `repeated lookups return the cached instance`() = assertTrue(catalog.infoFor("USD") === catalog.infoFor("USD"))
+
+    // region Supplementary names
+
+    @Test
+    fun `codes missing from ISO 4217 still get a real name`() {
+        // These six are in the rate feed but not in ISO 4217, so the platform has no
+        // name for them and they rendered with their own code as their title.
+        listOf("FOK", "GGP", "IMP", "JEP", "KID", "TVD").forEach { code ->
+            val info = catalog.infoFor(code)
+            assertNotEquals(code, info.displayName, "$code fell back to its own code")
+            assertFalse(info.isFallback, "$code should not be a fallback")
+        }
+    }
+
+    @Test
+    fun `offshore renminbi is distinguishable from onshore`() {
+        // The reported bug: two rows reading "Chinese Yuan", at two different rates.
+        assertNotEquals(catalog.infoFor("CNY").displayName, catalog.infoFor("CNH").displayName)
+    }
+
+    @Test
+    fun `offshore renminbi is still recognisably the yuan`() {
+        assertTrue(catalog.infoFor("CNH").displayName.contains("Yuan", ignoreCase = true))
+    }
+
+    @Test
+    fun `the pegged issues keep the flag of their own territory`() {
+        assertEquals("🇯🇪", catalog.infoFor("JEP").flag)
+        assertEquals("🇮🇲", catalog.infoFor("IMP").flag)
+        assertEquals("🇹🇻", catalog.infoFor("TVD").flag)
+    }
+
+    @Test
+    fun `the pegged issues get their neighbour's minor units`() {
+        // All six track a two-decimal currency, which the default already gives them.
+        listOf("FOK", "GGP", "IMP", "JEP", "KID", "TVD").forEach {
+            assertEquals(2, catalog.infoFor(it).minorUnits, it)
+        }
+    }
+
+    @Test
+    fun `a supplementary name never displaces the platform's own`() {
+        // The table is a fallback. A device that names a currency itself — localised,
+        // and kept current by the system — must keep its own answer.
+        val platformName = java.util.Currency.getInstance("CNY").getDisplayName(Locale.US)
+        assertEquals(platformName, catalog.infoFor("CNY").displayName)
+    }
+
+    @Test
+    fun `an unknown code with no supplementary name is still a fallback`() {
+        assertTrue(catalog.infoFor("QQQ").isFallback)
+    }
+
+    // endregion
+
+    // region Name choice
+    //
+    // Exercised directly rather than through the catalog. The desktop JDK these tests
+    // run on does not know CNH at all, so going through the platform can only ever
+    // reach the "no name" branch — and the collision branch is the reported bug.
+
+    @Test
+    fun `a platform name is preferred over the supplementary one`() {
+        assertEquals(
+            "Chinese Yuan (offshore)",
+            supplementedName("CNH", platformName = "Chinese Yuan (offshore)", twinName = "Chinese Yuan"),
+        )
+    }
+
+    @Test
+    fun `a localised platform name is kept rather than replaced with English`() {
+        assertEquals(
+            "yuan chinois (extraterritorial)",
+            supplementedName("CNH", platformName = "yuan chinois (extraterritorial)", twinName = "yuan chinois"),
+        )
+    }
+
+    @Test
+    fun `a platform name identical to its twin's is replaced`() {
+        // Exactly the device state that was reported: two rows both reading
+        // "Chinese Yuan", at rates 0.39% apart.
+        assertEquals(
+            "Chinese Yuan (offshore)",
+            supplementedName("CNH", platformName = "Chinese Yuan", twinName = "Chinese Yuan"),
+        )
+    }
+
+    @Test
+    fun `a missing platform name falls back to the supplementary one`() {
+        assertEquals("Jersey Pound", supplementedName("JEP", platformName = null, twinName = null))
+    }
+
+    @Test
+    fun `a code with neither a platform nor a supplementary name keeps the code`() {
+        assertEquals("ZZZ", supplementedName("ZZZ", platformName = null, twinName = null))
+    }
+
+    @Test
+    fun `an ordinary currency is untouched by the twin check`() {
+        assertEquals("US Dollar", supplementedName("USD", platformName = "US Dollar", twinName = null))
+    }
+
+    @Test
+    fun `a collision with no supplementary name keeps the platform name`() {
+        // Better a duplicated name than none: the code beneath it still separates them.
+        assertEquals("Some Dollar", supplementedName("AAA", platformName = "Some Dollar", twinName = "Some Dollar"))
+    }
+
+    // endregion
 }

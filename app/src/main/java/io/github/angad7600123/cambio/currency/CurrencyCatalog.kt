@@ -14,6 +14,10 @@ import java.util.Locale
  * A code the platform does not recognise still resolves — to a fallback whose name
  * is the code itself — so an unfamiliar currency appearing in an API response can
  * never crash or silently vanish from the picker.
+ *
+ * [supplementedName] covers the handful of codes the platform's data serves badly.
+ * It is a *fallback*, not an override: a device that names a currency properly, and
+ * in the user's own language, keeps its own answer.
  */
 class CurrencyCatalog(private val locale: Locale = Locale.getDefault()) {
     private val cache = HashMap<String, CurrencyInfo>()
@@ -31,7 +35,7 @@ class CurrencyCatalog(private val locale: Locale = Locale.getDefault()) {
 
         return CurrencyInfo(
             code = code,
-            displayName = platform?.getDisplayName(locale)?.takeIf { it != code } ?: code,
+            displayName = nameFor(code, platform),
             symbol = platform?.getSymbol(locale) ?: code,
             // getDefaultFractionDigits() returns -1 for pseudo-currencies such as XDR;
             // treat those as 2 so amounts still render sensibly.
@@ -39,6 +43,15 @@ class CurrencyCatalog(private val locale: Locale = Locale.getDefault()) {
             flag = flagFor(code),
         )
     }
+
+    /** Looks up both platform names and lets [supplementedName] decide between them. */
+    private fun nameFor(code: String, platform: Currency?): String = supplementedName(
+        code = code,
+        platformName = platform?.getDisplayName(locale)?.takeIf { it != code },
+        twinName = INDISTINCT_FROM[code]?.let { twin ->
+            runCatching { Currency.getInstance(twin).getDisplayName(locale) }.getOrNull()
+        },
+    )
 
     /**
      * Derives a flag emoji from the currency code.
@@ -63,6 +76,15 @@ class CurrencyCatalog(private val locale: Locale = Locale.getDefault()) {
     private companion object {
         const val DEFAULT_MINOR_UNITS = 2
 
+        /**
+         * Codes whose platform name may be word-for-word another currency's.
+         *
+         * Offshore and onshore renminbi are the same money in two markets separated
+         * by capital controls, so they share a name but not a rate — and a picker
+         * offering "Chinese Yuan" twice, at two different rates, is unusable.
+         */
+        val INDISTINCT_FROM = mapOf("CNH" to "CNY")
+
         /** Unicode REGIONAL INDICATOR SYMBOL LETTER A. */
         const val REGIONAL_INDICATOR_BASE = 0x1F1E6
 
@@ -86,3 +108,50 @@ class CurrencyCatalog(private val locale: Locale = Locale.getDefault()) {
         )
     }
 }
+
+/**
+ * Chooses the best name for a currency, given what the platform offered.
+ *
+ * Prefers the platform's name, which is localised and kept current by the system.
+ * Falls back to [SUPPLEMENTARY_NAMES] in the two cases where it is not usable, both
+ * of which were seen on a real device:
+ *
+ * - the platform has **no** name, so the code was rendered as its own title. Six
+ *   codes in the rate feed are outside ISO 4217 entirely.
+ * - the platform's name is **word for word** another currency's. Older platform data
+ *   calls CNH plain "Chinese Yuan", exactly as it calls CNY, putting two rows with
+ *   different rates under one identical name.
+ *
+ * Separated from the catalog so both branches can be tested. The desktop JDK used by
+ * unit tests does not know CNH at all, so a test going through the platform could
+ * only ever reach the first case — and the second is the one that was reported.
+ *
+ * @param platformName what the platform calls it, or null if it has no name for it.
+ * @param twinName the name of the currency this one may be confused with, if any.
+ */
+internal fun supplementedName(code: String, platformName: String?, twinName: String?): String {
+    if (platformName != null && platformName != twinName) return platformName
+    return SUPPLEMENTARY_NAMES[code] ?: platformName ?: code
+}
+
+/**
+ * Names for codes the platform's own data serves badly.
+ *
+ * English only, and deliberately so: this is reached only where the platform
+ * offered nothing usable, and a name in the wrong language beats a bare code
+ * or two identical rows. Everything else stays localised by the system.
+ *
+ * The six non-ISO codes are all pegged one-to-one to a neighbour — the Crown
+ * Dependency pounds to sterling, the Pacific dollars to the Australian
+ * dollar, the Faroese króna to the Danish — which is why ISO 4217 never gave
+ * them codes and the platform has nothing to say about them.
+ */
+private val SUPPLEMENTARY_NAMES = mapOf(
+    "CNH" to "Chinese Yuan (offshore)",
+    "FOK" to "Faroese Króna",
+    "GGP" to "Guernsey Pound",
+    "IMP" to "Isle of Man Pound",
+    "JEP" to "Jersey Pound",
+    "KID" to "Kiribati Dollar",
+    "TVD" to "Tuvaluan Dollar",
+)
