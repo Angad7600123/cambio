@@ -2,6 +2,7 @@ package io.github.angad7600123.cambio.ui
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
+import io.github.angad7600123.cambio.ui.components.EntryAnimation
 import io.github.angad7600123.cambio.ui.components.ExpressionTransformation
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -103,6 +104,85 @@ class ExpressionTransformationTest {
         assertEquals(3, mapping.originalToTransformed(99))
         assertEquals(0, mapping.originalToTransformed(-4))
         assertEquals(3, mapping.transformedToOriginal(99))
+    }
+
+    // endregion
+
+    // region Entry animation
+
+    private fun growing(raw: String, index: Int, scale: Float = 0.3f) = ExpressionTransformation(
+        operatorColor = Color(0xFF5DD4B9),
+        groupingSeparator = ',',
+        decimalSeparator = '.',
+        entry = EntryAnimation(index, scale),
+    ).filter(AnnotatedString(raw))
+
+    /** The scaling span, as opposed to the operator-colour ones. */
+    private fun scaleSpan(result: androidx.compose.ui.text.input.TransformedText) =
+        result.text.spanStyles.single { it.item.fontSize != androidx.compose.ui.unit.TextUnit.Unspecified }
+
+    @Test
+    fun `the growing glyph is the one at the caret, not the last one`() {
+        // "1234567" -> "1,234,567". Growing raw index 2 (the '3') must style visual
+        // index 3, leaving every later character alone. Styling the last character
+        // instead is what dragged the right-hand end of the figure about.
+        val span = scaleSpan(growing("1234567", index = 2))
+        assertEquals(3, span.start)
+        assertEquals(4, span.end)
+    }
+
+    @Test
+    fun `the growing glyph covers exactly one character`() {
+        val span = scaleSpan(growing("1234567", index = 6))
+        assertEquals(1, span.end - span.start)
+    }
+
+    @Test
+    fun `a glyph before a grouping separator is not confused with it`() {
+        // Raw index 0 is the leading '1' of "1,234,567"; the comma must stay unscaled.
+        val span = scaleSpan(growing("1234567", index = 0))
+        assertEquals(0, span.start)
+        assertEquals(1, span.end)
+    }
+
+    @Test
+    fun `growing the last glyph still works`() {
+        val result = growing("1250", index = 3)
+        val span = scaleSpan(result)
+        assertEquals(result.text.length - 1, span.start)
+    }
+
+    @Test
+    fun `an operator can be the growing glyph`() {
+        // "1250+15" -> "1,250 + 15": the '+' is raw 4, visual 6, and the spaces
+        // around it must not be swept into the span.
+        val span = scaleSpan(growing("1250+15", index = 4))
+        assertEquals(6, span.start)
+        assertEquals(7, span.end)
+    }
+
+    @Test
+    fun `the growing glyph is lifted so it does not read as a subscript`() {
+        val span = scaleSpan(growing("123", index = 1))
+        assertTrue(span.item.baselineShift!!.multiplier > 0f, "expected an upward shift")
+    }
+
+    @Test
+    fun `nothing is scaled when no entry is animating`() {
+        val spans = transform("1234567").text.spanStyles
+        assertTrue(spans.none { it.item.fontSize != androidx.compose.ui.unit.TextUnit.Unspecified })
+    }
+
+    @Test
+    fun `an out-of-range entry index is ignored`() {
+        val spans = growing("123", index = 9).text.spanStyles
+        assertTrue(spans.none { it.item.fontSize != androidx.compose.ui.unit.TextUnit.Unspecified })
+    }
+
+    @Test
+    fun `a finished animation leaves the text unstyled`() {
+        val spans = growing("123", index = 1, scale = 1f).text.spanStyles
+        assertTrue(spans.none { it.item.fontSize != androidx.compose.ui.unit.TextUnit.Unspecified })
     }
 
     // endregion

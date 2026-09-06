@@ -57,9 +57,12 @@ into.
   everything runs on `BigDecimal`, never binary floating point
 - Chained calculations, backspace and clear
 - **The expression leads while you type** and steps back once evaluated. Operators
-  are tinted, each new character eases in, and a caret marks your place — with the
-  platform's own drag handle beneath it, so you can slide the caret through a long
-  figure. The soft keyboard never appears; the keypad is the only way in
+  are tinted, and a caret marks your place — with the platform's own drag handle
+  beneath it, so you can slide the caret through a long figure. The soft keyboard
+  never appears; the keypad is the only way in
+- **Each character grows in where the caret is**, so typing into the middle of a
+  figure leaves everything after it perfectly still. Timings and sizes were measured
+  frame by frame off One UI rather than guessed
 - **The figure is measured, not guessed.** Type size steps down twice to keep a long
   number whole, fitted against the box the screen actually gives it. Past fifteen
   digits a brief message says so, rather than the keypad going quietly dead

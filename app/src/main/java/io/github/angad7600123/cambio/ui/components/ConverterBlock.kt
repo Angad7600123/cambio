@@ -170,12 +170,16 @@ private fun FigureRow(
     val colors = CambioTheme.colors
     val formatter = remember { NumberDisplayFormatter() }
 
-    // Each new character eases in, as One UI's does. The scale is applied inside the
-    // transformation so only the newest glyph moves, not the whole figure.
-    val typedScale = rememberEntryScale(text)
-    val entryScale = if (isActive) typedScale else 1f
-    val transformation = remember(colors.accentText, entryScale) {
-        ExpressionTransformation.forLocale(colors.accentText, formatter, entryScale)
+    // Each new character grows into place where the caret is, as One UI's does. The
+    // scale is applied inside the transformation so only that one glyph moves.
+    //
+    // The idle figure never animates: it is not being typed into, it changes on every
+    // keystroke anyway, and motion in two places at once is what made the display feel
+    // unsettled rather than alive.
+    val typed = rememberEntryAnimation(text, cursor)
+    val entry = if (isActive) typed else EntryAnimation.None
+    val transformation = remember(colors.accentText, entry) {
+        ExpressionTransformation.forLocale(colors.accentText, formatter, entry)
     }
 
     // The active figure holds a raw expression that the transformation formats for
@@ -200,6 +204,9 @@ private fun FigureRow(
         animationSpec = tween(durationMillis = RESIZE_MILLIS),
         label = "figureFontSize",
     )
+    // The idle figure steps between sizes outright. Easing it would set the whole
+    // lower line sliding on every keypress, alongside the figure actually being typed.
+    val fontSize = if (isActive) animatedSize else fitted.value
 
     val textColor by animateColorAsState(
         targetValue = if (isActive) colors.textPrimary else colors.textSecondary,
@@ -213,7 +220,7 @@ private fun FigureRow(
         backgroundColor = caretColor.copy(alpha = SELECTION_ALPHA),
     )
     val style = baseStyle.copy(
-        fontSize = animatedSize.sp,
+        fontSize = fontSize.sp,
         color = textColor,
         textAlign = TextAlign.End,
     )
@@ -393,7 +400,10 @@ private const val SELECTION_ALPHA = 0.3f
 private const val HALF_TURN_DEGREES = 180f
 private const val SWAP_MILLIS = 320
 private const val ACTIVATE_MILLIS = 180
-private const val RESIZE_MILLIS = 140
+
+/** Matched to the reference: the figure takes the same time to change size as a
+ * character takes to grow into it. */
+private const val RESIZE_MILLIS = ENTRY_MILLIS
 
 private val ROW_RADIUS = 10.dp
 private val CHEVRON_SIZE = 18.dp

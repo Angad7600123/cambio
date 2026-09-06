@@ -23,13 +23,14 @@ import io.github.angad7600123.cambio.format.NumberDisplayFormatter
  * [OffsetMapping].
  *
  * That mapping is what makes tapping into the middle of `12,345,678` land the caret
- * between the digits you actually meant.
+ * between the digits you actually meant, and it is also what lets the entry animation
+ * find the glyph the caret is on.
  */
-class ExpressionTransformation(
+internal class ExpressionTransformation(
     private val operatorColor: Color,
     private val groupingSeparator: Char,
     private val decimalSeparator: Char,
-    private val lastCharScale: Float = 1f,
+    private val entry: EntryAnimation = EntryAnimation.None,
 ) : VisualTransformation {
 
     override fun filter(text: AnnotatedString): TransformedText {
@@ -82,18 +83,29 @@ class ExpressionTransformation(
         }
         originalToTransformed[raw.length] = builder.length
 
-        // One UI pops each new character in. Scaling the font alone would drop the
-        // glyph onto the baseline and read as a subscript, so the baseline is lifted
-        // by the same proportion to keep it centred as it grows.
-        if (lastCharScale < 1f && builder.isNotEmpty()) {
-            spans += AnnotatedString.Range(
-                SpanStyle(
-                    fontSize = TextUnit(lastCharScale, TextUnitType.Em),
-                    baselineShift = BaselineShift((1f - lastCharScale) * BASELINE_LIFT),
-                ),
-                builder.length - 1,
-                builder.length,
-            )
+        // One UI grows each new character into place. The character is addressed by
+        // its index in the raw expression, not by being last: typing into the middle
+        // of a figure must animate the digit under the caret, leaving everything
+        // after it perfectly still.
+        //
+        // Every original character occupies exactly one output character — separators
+        // and spacing are inserted *before* the position that gets recorded — so the
+        // glyph to style is the single character at its mapped offset.
+        if (entry.index in raw.indices && entry.scale < 1f) {
+            val at = originalToTransformed[entry.index]
+            if (at < builder.length) {
+                spans += AnnotatedString.Range(
+                    SpanStyle(
+                        fontSize = TextUnit(entry.scale, TextUnitType.Em),
+                        // Scaling the font alone drops the glyph onto the baseline and
+                        // reads as a subscript, so the baseline is lifted in step to
+                        // keep it growing about its own middle.
+                        baselineShift = BaselineShift((1f - entry.scale) * BASELINE_LIFT),
+                    ),
+                    at,
+                    at + 1,
+                )
+            }
         }
 
         val transformed = builder.toString()
@@ -169,19 +181,30 @@ class ExpressionTransformation(
         const val MINUS = '−'
         private const val GROUP_SIZE = 3
 
-        /** How far to lift a shrunken glyph so it grows from its middle. */
-        private const val BASELINE_LIFT = 0.36f
+        /**
+         * How far a shrunken glyph is lifted off the baseline as it grows.
+         *
+         * Not all the way to centred. Scaling alone leaves the glyph sitting on the
+         * baseline, which reads as a subscript; lifting it fully to the line's middle
+         * reads as a superscript. Measured against the reference, One UI's growing
+         * glyph sits about three fifths of the way from the baseline to the centre,
+         * and this is that fraction of the full centring lift.
+         */
+        private const val BASELINE_LIFT = 0.22f
 
         /** Glyphs drawn in the accent tone once transformed. */
         private val ACCENTED = setOf('*', '/', '-', '+', '(', ')')
 
         /** Builds a transformation using the device's own separators. */
-        fun forLocale(operatorColor: Color, formatter: NumberDisplayFormatter, lastCharScale: Float = 1f) =
-            ExpressionTransformation(
-                operatorColor = operatorColor,
-                groupingSeparator = formatter.groupingSeparator,
-                decimalSeparator = formatter.decimalSeparator,
-                lastCharScale = lastCharScale,
-            )
+        fun forLocale(
+            operatorColor: Color,
+            formatter: NumberDisplayFormatter,
+            entry: EntryAnimation = EntryAnimation.None,
+        ) = ExpressionTransformation(
+            operatorColor = operatorColor,
+            groupingSeparator = formatter.groupingSeparator,
+            decimalSeparator = formatter.decimalSeparator,
+            entry = entry,
+        )
     }
 }
