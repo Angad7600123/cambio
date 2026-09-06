@@ -100,8 +100,10 @@ type into, and a list that gives the name room and rules between the rows.
 **App**
 
 - Home-screen widget running the identical calculator and keypad, with both
-  currencies side by side and a tappable active side. Every dimension is derived
-  from the widget's own size, so it stays legible as you resize it
+  currencies side by side, a tappable active side and a swap control between them.
+  Every dimension is derived from the widget's own size, so it stays legible as you
+  resize it, and it follows the app: change a currency there and the widget redraws
+  without being touched
 - Light and dark themes, following the system by default, with an optional
   Material You / system-colour mode that picks up your device or OEM theme
 - Calculation history (last 100), tap to restore. Only actual calculations are

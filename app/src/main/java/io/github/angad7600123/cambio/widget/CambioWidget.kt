@@ -225,6 +225,7 @@ private fun WidgetDisplay(
             metrics = metrics,
             modifier = GlanceModifier.defaultWeight(),
         )
+        WidgetSwap(palette = palette, metrics = metrics)
         WidgetSide(
             value = rightValue,
             code = rightCode,
@@ -235,6 +236,37 @@ private fun WidgetDisplay(
             palette = palette,
             metrics = metrics,
             modifier = GlanceModifier.defaultWeight(),
+        )
+    }
+}
+
+/**
+ * The swap control, between the two figures.
+ *
+ * The app puts it on the rule dividing its stacked figures; side by side, the
+ * equivalent place is the gap between them — which was empty, and part of why the
+ * numbers looked stranded at the edges of a wide widget.
+ *
+ * A plain glyph, no background: it is a third element in a row that belongs to the
+ * two figures, and giving it a filled shape would let it compete with them.
+ */
+@Composable
+private fun WidgetSwap(palette: WidgetPalette, metrics: WidgetMetrics) {
+    Box(
+        modifier = GlanceModifier
+            .width(metrics.swapWidth)
+            .clickable(actionRunCallback<WidgetSwapActionCallback>()),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = SWAP_GLYPH,
+            maxLines = 1,
+            style = TextStyle(
+                color = palette.accentText,
+                fontSize = metrics.swapSp.sp(),
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center,
+            ),
         )
     }
 }
@@ -403,6 +435,9 @@ private enum class WidgetKeyStyle(val backgroundRes: Int) {
  * row.
  */
 /** Shown in place of a figure until rates are available. */
+/** Two arrows, the same mark the app uses for the swap. */
+private const val SWAP_GLYPH = "⇄"
+
 private const val PLACEHOLDER = "—"
 
 private data class WidgetMetrics(
@@ -417,6 +452,9 @@ private data class WidgetMetrics(
     val resultSp: Float,
     val codeSp: Float,
     val keyGlyphSp: Float,
+    /** The swap control's column, between the two figures. */
+    val swapWidth: Dp,
+    val swapSp: Float,
 ) {
     companion object {
         private const val GAP_RATIO = 0.16f
@@ -441,6 +479,27 @@ private data class WidgetMetrics(
         private val MIN_DIAMETER = 40.dp
         private val MAX_DIAMETER = 88.dp
 
+        /** The swap control's share of the width, and the bounds it may not leave. */
+        private const val SWAP_SHARE = 0.10f
+        private val MIN_SWAP = 20.dp
+        private val MAX_SWAP = 40.dp
+
+        /** How much of the display band the figure itself takes, above its code. */
+        private const val FIGURE_OF_BAND = 0.52f
+
+        /**
+         * What a figure is sized to fit: about eight characters, which covers
+         * "1,076.33" and every reading shorter than it. Longer ones ellipsise, as
+         * they did before.
+         */
+        private const val TYPICAL_CHARS = 8f
+
+        /** A digit's advance as a fraction of its point size, for this typeface. */
+        private const val CHAR_WIDTH_EM = 0.58f
+
+        private const val MIN_RESULT_SP = 13f
+        private const val MAX_RESULT_SP = 34f
+
         fun forSize(size: DpSize): WidgetMetrics {
             val widthBudget = COLUMNS + (COLUMNS - 1) * GAP_RATIO + 2 * PADDING_RATIO
             val byWidth = size.width.value / widthBudget
@@ -460,6 +519,19 @@ private data class WidgetMetrics(
             val availableCell = (size.width.value - 2 * padding) / COLUMNS
             val columnWidth = minOf(availableCell, diameter * MAX_CELL_RATIO)
 
+            // The display band, and what one figure gets of it once the swap
+            // control has taken its share of the width.
+            val displayHeight = size.height.value * DISPLAY_SHARE
+            val swapWidth = (size.width.value * SWAP_SHARE).coerceIn(MIN_SWAP.value, MAX_SWAP.value)
+            val figureWidth = (size.width.value - 2 * padding - swapWidth) / 2
+
+            // Whichever runs out first. A figure is one line of digits under a
+            // smaller code line, so the pair has to fit the band's height; and the
+            // longest reading the widget shows is about eight characters wide.
+            val byFigureHeight = displayHeight * FIGURE_OF_BAND
+            val byFigureWidth = figureWidth / TYPICAL_CHARS / CHAR_WIDTH_EM
+            val resultSp = minOf(byFigureHeight, byFigureWidth).coerceIn(MIN_RESULT_SP, MAX_RESULT_SP)
+
             return WidgetMetrics(
                 keyDiameter = diameter.dp,
                 keyGap = (diameter * GAP_RATIO).dp,
@@ -467,11 +539,17 @@ private data class WidgetMetrics(
                 keypadHeight = (rowHeight * ROWS).dp,
                 rowHeight = rowHeight.dp,
                 columnWidth = columnWidth.dp,
-                // Tied to the key size so the display is never lost above a large
-                // keypad, nor overpowering on a small one.
-                resultSp = diameter * 0.52f,
-                codeSp = diameter * 0.26f,
                 keyGlyphSp = diameter * 0.42f,
+                swapWidth = swapWidth.dp,
+                swapSp = resultSp * 0.62f,
+                // Measured against the room a figure actually gets, not inferred
+                // from the keys. Tying it to the key diameter meant a wide, short
+                // widget — where the keypad is limited by height and the keys go
+                // small — shrank its figures too, while leaving most of its width
+                // unused. The keys and the display are constrained by different
+                // things and have to be sized by different things.
+                resultSp = resultSp,
+                codeSp = resultSp * 0.42f,
             )
         }
     }
