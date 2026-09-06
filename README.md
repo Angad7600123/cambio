@@ -28,22 +28,27 @@ same engine and the same theme.
 
 ## Screenshots
 
-| Calculator (dark) | Currency picker | Settings |
+| Calculator | Currency picker | Settings |
 | :---: | :---: | :---: |
-| ![Calculator in dark theme showing 1,250 + 15% = 1,437.5 converted to EUR](docs/screenshots/01-dark-calculation.png) | ![Searchable currency picker listing world currencies with flags and live rates](docs/screenshots/02-dark-currency-picker.png) | ![Settings sheet with theme options and rate provider attribution](docs/screenshots/03-dark-settings.png) |
+| ![Calculator showing 1,250 + 15% = 1,437.5 US dollars with 1,237.78 euros converted beneath](docs/screenshots/01-dark-calculation.png) | ![Currency picker listing world currencies with flags, the euro selected and ticked](docs/screenshots/02-dark-currency-picker.png) | ![Settings sheet with theme options, system colours and rate provider attribution](docs/screenshots/03-dark-settings.png) |
 
-| Home-screen widget |
-| :---: |
-| ![Home screen widget showing the same calculator](docs/screenshots/05-widget.png) |
+| History | Home-screen widget |
+| :---: | :---: |
+| ![History sheet listing four past calculations with their converted values](docs/screenshots/04-dark-history.png) | ![Home screen widget showing 1,250 US dollars beside 1,076.33 euros above a full keypad](docs/screenshots/05-widget.png) |
 
-*Screenshots captured from the app running on a Pixel 10 Pro XL emulator.*
+*Captured on a Pixel 10 Pro XL emulator.*
 
-The calculator follows Samsung's One UI closely: key sizes, gutters, palette and
-the press animation were measured from a screen recording of it rather than
-approximated. The conversion block and the currency picker follow the iOS
-Calculator's converter instead, because One UI's calculator has no equivalent to
-copy — paired figures with the code as the control, and an active side you type
-into.
+## How it was built
+
+The keypad follows Samsung's One UI Calculator, and not by eye. Key diameters,
+gutters, the exact greys, the press halo and every animation timing were **measured
+from screen recordings frame by frame** — the entry animation, for instance, is a
+new character growing from 30% to full over 180ms on One UI's easing curve, because
+that is what stepping through the frames showed.
+
+Where One UI has no equivalent to copy, the iOS Calculator's converter is the model
+instead: paired figures with the currency code as the control, an active side you
+type into, and a list that gives the name room and rules between the rows.
 
 ## Features
 
@@ -56,16 +61,17 @@ into.
 - **Exact decimal arithmetic.** `0.1 + 0.2` is `0.3`, not `0.30000000000000004` —
   everything runs on `BigDecimal`, never binary floating point
 - Chained calculations, backspace and clear
-- **The expression leads while you type** and steps back once evaluated. Operators
-  are tinted, and a caret marks your place — with the platform's own drag handle
-  beneath it, so you can slide the caret through a long figure. The soft keyboard
-  never appears; the keypad is the only way in
+- **The expression leads while you type** and steps back once evaluated, with
+  operators tinted
+- **Edit anywhere in the number.** A caret marks your place, with the platform's own
+  drag handle beneath it to slide through a long figure. The soft keyboard never
+  appears — the keypad is the only way in
 - **Each character grows in where the caret is**, so typing into the middle of a
-  figure leaves everything after it perfectly still. Timings and sizes were measured
-  frame by frame off One UI rather than guessed
-- **The figure is measured, not guessed.** Type size steps down twice to keep a long
-  number whole, fitted against the box the screen actually gives it. Past fifteen
-  digits a brief message says so, rather than the keypad going quietly dead
+  figure leaves every digit after it perfectly still
+- **The type size is measured, not guessed.** It steps down to keep a long number
+  whole, fitted against the box the screen actually gives it, so it holds on any
+  width. Past fifteen digits a brief message says so, rather than the keypad going
+  quietly dead
 - An incomplete expression floats a brief message and **leaves your input alone**,
   rather than blanking the display
 - Numbers beyond `Long` range, with scientific notation past `1e16`
@@ -73,14 +79,16 @@ into.
 **Currency**
 
 - 160+ currencies, live rates
-- **Convert in either direction.** Tap either figure to move the caret to that
-  currency and type there; the other side follows. Neither figure moves — the
-  active one is simply the bright one and the idle one greys out. Values carry
-  across when you switch, so nothing is lost
-- Swap direction with one tap; searchable picker by code *or* name, with recents
-  pinned, and an index scrubber whose letter drop is pulled out of the rail and falls
-  back into it. Rows give the full name room enough for the longest of them —
-  `Bosnia-Herzegovina Convertible Mark` — rather than clipping it mid-word
+- **Convert in either direction.** Tap either figure to type in that currency; the
+  other follows. Neither figure moves — the active one is simply the bright one and
+  the idle one greys out. Values carry across when you switch, so nothing is lost
+- Swap direction with one tap
+- Searchable picker by code *or* name, with recents pinned. Rows give the full name
+  the whole width — enough for the longest of them, `Bosnia-Herzegovina Convertible
+  Mark` — rather than clipping it mid-word
+- **An index scrubber** down the edge whose letter drop is pulled out of the rail and
+  falls back into it, because a stack of 26 tappable letters is cramped and imprecise
+  at this length
 - Amounts rounded to each currency's real minor units — 2 for USD, **0 for JPY**,
   **3 for KWD** — escalating precision so a tiny amount never renders as a
   misleading `0.00`
@@ -88,14 +96,14 @@ into.
 
 **App**
 
-- Home-screen widget running the identical calculator and keypad. Both currencies
-  sit side by side with a tappable active side, and every size is proportional to
-  the widget, so it stays legible from its smallest size upward
+- Home-screen widget running the identical calculator and keypad, with both
+  currencies side by side and a tappable active side. Every dimension is derived
+  from the widget's own size, so it stays legible as you resize it
 - Light and dark themes, following the system by default, with an optional
   Material You / system-colour mode that picks up your device or OEM theme
 - Calculation history (last 100), tap to restore
 - Landscape and tablet layouts, not a locked-portrait phone app
-- Full TalkBack support, 48dp touch targets, WCAG 2.1 AA contrast
+- Full TalkBack support and WCAG 2.1 AA contrast
 - Numbers formatted for your device locale — `1,234.5` or `1.234,5`, with the
   keypad's decimal key matching
 
@@ -108,6 +116,7 @@ into.
 | **JDK** | 21 (Android Studio's bundled JBR works) |
 | **Android SDK** | Platform 36, Build-Tools 36 |
 | **Gradle** | 8.13 (via the included wrapper) |
+| **Kotlin / AGP** | 2.2.21 / 8.13.2 |
 
 ## Getting started
 
@@ -148,8 +157,8 @@ artifact.
 
 ### Add the widget
 
-Long-press the home screen → **Widgets** → **Cambio**. The widget needs roughly a
-4×5 cell area to fit the display and the full keypad.
+Long-press the home screen → **Widgets** → **Cambio**. It lands at 4×5 cells and
+resizes freely in both directions from there, down to roughly 180×200dp.
 
 ## Exchange rates
 
@@ -203,6 +212,9 @@ Worth knowing before you rely on this:
 - The free open endpoint has **no formal uptime guarantee**.
 - Rates are mid-market reference values. They do **not** include the spread, fees or
   margin any bank or exchange will actually charge you.
+- The feed quotes onshore and offshore renminbi separately (`CNY` and `CNH`). They
+  are the same currency in two markets separated by capital controls, and their
+  rates differ by a few tenths of a percent.
 - **Attribution is required.** See below.
 
 ### Attribution requirement
@@ -248,8 +260,12 @@ real operator precedence for free, and it is why `CalculatorEngine.evaluate()`
 - **The provider lives behind one file.** `RatesRemoteDataSource` is the only class
   that knows the API exists. Swapping providers means replacing that one file.
 - **Currency metadata comes from the platform.** Names, symbols and minor-unit
-  counts are read from `java.util.Currency` rather than a hand-maintained table, so
-  they stay correct and are already localised.
+  counts are read from `java.util.Currency`, so they stay correct as the system
+  updates and are already localised. A small supplementary table fills the two gaps
+  that leaves — codes outside ISO 4217 that the platform cannot name at all, and
+  names that come back word-for-word identical to another currency's. It is a
+  fallback, never an override: a device that names a currency itself keeps its own
+  answer, in its own language.
 
 ## Testing
 
@@ -260,9 +276,9 @@ real operator precedence for free, and it is why `CalculatorEngine.evaluate()`
 ./gradlew lintDebug                  # Android Lint
 ```
 
-**No test ever contacts the real exchange-rate API.** HTTP is served by a local
-`MockWebServer`, and the clock is injected so cache-expiry behaviour is asserted
-exactly rather than by sleeping.
+253 unit tests and 27 instrumented tests. **No test ever contacts the real
+exchange-rate API** — HTTP is served by a local `MockWebServer`, and the clock is
+injected so cache-expiry behaviour is asserted exactly rather than by sleeping.
 
 Coverage focuses on logic that can genuinely break:
 
@@ -272,10 +288,14 @@ Coverage focuses on logic that can genuinely break:
 - Every failure mode: division by zero, malformed input, overflow, empty
 - The keypress state machine, including a stress test that mashes the keypad and
   asserts the engine always reaches a verdict
+- Caret editing — inserting, deleting and correcting mid-number — and the mapping
+  between the raw expression and its grouped, glyphed display form
 - Cross-rate maths, missing currencies, and a corrupt zero-rate table
 - HTTP 500/404, malformed JSON, empty bodies, missing fields, unreachable server
 - Stale-while-error caching, and expiry driven by the provider's own timestamp
-- Currency minor units and locale-aware formatting
+- Currency minor units, name fallbacks and locale-aware formatting
+- Type sizing measured against a real font on a real device, including the exact
+  figures that used to clip
 
 There is no enforced coverage threshold — the goal is tests that mean something,
 not a number.
@@ -303,7 +323,6 @@ no tracking SDKs.**
 - Widget interaction goes through `RemoteViews`, so keypresses have a small
   system-imposed latency compared with the app, and the widget has no ripple or
   press animation.
-- The widget needs roughly a 4×5 cell area; smaller sizes are not supported.
 
 ## Contributing
 
