@@ -6,7 +6,6 @@ import io.github.angad7600123.cambio.currency.CurrencyInfo
 import io.github.angad7600123.cambio.data.HistoryEntry
 import io.github.angad7600123.cambio.data.RatesError
 import io.github.angad7600123.cambio.data.ThemeMode
-import java.math.BigDecimal
 
 /** What the app knows about the rate table right now. */
 @Immutable
@@ -66,8 +65,6 @@ data class CalculatorUiState(
     val rateDisplay: String? = null,
     val ratesStatus: RatesStatus = RatesStatus.Loading,
     val availableCurrencies: List<CurrencyInfo> = emptyList(),
-    /** Raw rates against the fetch base, so the picker can preview each row. */
-    val rates: Map<String, BigDecimal> = emptyMap(),
     val recentCurrencies: List<CurrencyInfo> = emptyList(),
     val history: List<HistoryEntry> = emptyList(),
     val themeMode: ThemeMode = ThemeMode.SYSTEM,

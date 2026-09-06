@@ -312,7 +312,6 @@ class CalculatorViewModel(
             rateDisplay = rateDisplay(settings, snapshot, from, to),
             ratesStatus = ratesStatus(snapshot, refreshState),
             availableCurrencies = availableCurrencies(snapshot),
-            rates = snapshot?.rates.orEmpty(),
             recentCurrencies = settings.recentCurrencies.map(catalog::infoFor),
             history = history,
             themeMode = settings.themeMode,

@@ -141,8 +141,6 @@ fun CalculatorScreen(
                     currencies = state.availableCurrencies,
                     recents = state.recentCurrencies,
                     selectedCode = state.fromCurrency.code,
-                    rates = state.rates,
-                    referenceCode = state.fromCurrency.code,
                     onSelect = {
                         onSelectFromCurrency(it)
                         activeSheet = ActiveSheet.None
@@ -153,9 +151,6 @@ fun CalculatorScreen(
                     currencies = state.availableCurrencies,
                     recents = state.recentCurrencies,
                     selectedCode = state.toCurrency.code,
-                    rates = state.rates,
-                    // Rows preview what one unit of the source currency buys.
-                    referenceCode = state.fromCurrency.code,
                     onSelect = {
                         onSelectToCurrency(it)
                         activeSheet = ActiveSheet.None

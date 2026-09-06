@@ -78,8 +78,9 @@ into.
   active one is simply the bright one and the idle one greys out. Values carry
   across when you switch, so nothing is lost
 - Swap direction with one tap; searchable picker by code *or* name, with recents
-  pinned, an index scrubber whose letter drop is pulled out of the rail and falls
-  back into it, and each row previewing its rate
+  pinned, and an index scrubber whose letter drop is pulled out of the rail and falls
+  back into it. Rows give the full name room enough for the longest of them —
+  `Bosnia-Herzegovina Convertible Mark` — rather than clipping it mid-word
 - Amounts rounded to each currency's real minor units — 2 for USD, **0 for JPY**,
   **3 for KWD** — escalating precision so a tiny amount never renders as a
   misleading `0.00`
