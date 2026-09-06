@@ -266,4 +266,39 @@ class CalculatorInputTest {
             }
         }
     }
+
+    // region Repeated equals
+
+    @Test
+    fun `equals on a finished result changes nothing`() {
+        // The crash this guards: each extra press used to re-evaluate the answer and
+        // file it as a new calculation, so three quick taps left three identical
+        // history entries stamped with the same second.
+        val evaluated = CalculatorInput.press(InputState.atEnd("2+3"), CalculatorKey.Equals)
+        assertEquals("5", evaluated.expression)
+
+        val again = CalculatorInput.press(evaluated, CalculatorKey.Equals)
+        assertEquals(evaluated, again)
+    }
+
+    @Test
+    fun `equals stays a no-op however many times it is pressed`() {
+        var state = CalculatorInput.press(InputState.atEnd("12+8"), CalculatorKey.Equals)
+        repeat(5) { state = CalculatorInput.press(state, CalculatorKey.Equals) }
+        assertEquals("20", state.expression)
+        assertTrue(state.justEvaluated)
+    }
+
+    @Test
+    fun `typing after equals makes equals work again`() {
+        // The guard keys on justEvaluated, which any other keypress clears, so a new
+        // expression built on the result still evaluates.
+        val evaluated = CalculatorInput.press(InputState.atEnd("2+3"), CalculatorKey.Equals)
+        var state = CalculatorInput.press(evaluated, CalculatorKey.Operator(OperatorType.MULTIPLY))
+        state = CalculatorInput.press(state, CalculatorKey.Digit(4))
+        state = CalculatorInput.press(state, CalculatorKey.Equals)
+        assertEquals("20", state.expression)
+    }
+
+    // endregion
 }

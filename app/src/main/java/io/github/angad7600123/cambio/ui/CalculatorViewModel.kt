@@ -123,6 +123,10 @@ class CalculatorViewModel(
     }
 
     private fun onEquals(before: InputState) {
+        // Nothing to do to a finished result, and nothing to record: repeating the
+        // press must not file the same answer again and again.
+        if (before.justEvaluated) return
+
         val after = CalculatorInput.press(before, CalculatorKey.Equals)
 
         if (after.error != null) {

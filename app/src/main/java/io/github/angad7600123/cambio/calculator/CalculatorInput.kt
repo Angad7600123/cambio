@@ -190,6 +190,10 @@ object CalculatorInput {
 
     private fun equals(state: InputState): InputState {
         if (state.expression.isEmpty()) return state
+        // A result is already final: equals has nothing left to do with it. Without
+        // this, pressing equals on `5` re-evaluates `5` and calls the answer a fresh
+        // calculation, which put duplicate entries in the history.
+        if (state.justEvaluated) return state
 
         return when (val result = CalculatorEngine.evaluate(state.expression)) {
             is CalcResult.Success ->

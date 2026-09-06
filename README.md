@@ -276,7 +276,7 @@ real operator precedence for free, and it is why `CalculatorEngine.evaluate()`
 ./gradlew lintDebug                  # Android Lint
 ```
 
-253 unit tests and 27 instrumented tests. **No test ever contacts the real
+261 unit tests and 27 instrumented tests. **No test ever contacts the real
 exchange-rate API** — HTTP is served by a local `MockWebServer`, and the clock is
 injected so cache-expiry behaviour is asserted exactly rather than by sleeping.
 
@@ -294,6 +294,8 @@ Coverage focuses on logic that can genuinely break:
 - HTTP 500/404, malformed JSON, empty bodies, missing fields, unreachable server
 - Stale-while-error caching, and expiry driven by the provider's own timestamp
 - Currency minor units, name fallbacks and locale-aware formatting
+- That the key glow never queues: a burst of presses is acted on as it arrives, and
+  the last one fades out in exactly its own duration
 - Type sizing measured against a real font on a real device, including the exact
   figures that used to clip
 

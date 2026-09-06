@@ -78,8 +78,21 @@ fun HistoryContent(
             return@Column
         }
 
+        // Deliberately unkeyed, so the list falls back to the item index.
+        //
+        // The key used to be the timestamp concatenated with the expression, and it
+        // crashed the app. Two identical calculations in the same second — easily
+        // done, and once trivially done by pressing equals twice — produced one
+        // identical key, and Compose throws on a repeated key. The concatenation was
+        // ambiguous as well: timestamp 1788720728 with expression "20" spells the
+        // same string as 17887207282 with "0".
+        //
+        // A key would buy stable identity across insertions and reordering, and this
+        // list has neither while it is on screen: entries are only ever added with
+        // the sheet closed, restoring one dismisses it, and clearing empties it. The
+        // index is therefore both stable and impossible to duplicate.
         LazyColumn(modifier = Modifier.heightIn(max = LIST_MAX_HEIGHT)) {
-            items(history, key = { it.timestampEpochSeconds.toString() + it.expression }) { entry ->
+            items(history) { entry ->
                 HistoryRow(entry = entry, onClick = { onRestore(entry) })
                 HorizontalDivider(
                     color = colors.outline,
