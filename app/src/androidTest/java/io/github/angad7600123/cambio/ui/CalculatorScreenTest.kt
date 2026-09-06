@@ -141,7 +141,7 @@ class CalculatorScreenTest {
         // The figure being typed is the large line; the running total sits under it.
         setScreen(state(activeText = "1234*2", preview = "2,468"))
 
-        composeRule.onNodeWithText("1,234 × 2", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("1,234×2", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("2,468").assertIsDisplayed()
     }
 
@@ -333,6 +333,6 @@ class CalculatorScreenTest {
         )
 
         composeRule.onNodeWithText("Cannot divide by zero").assertIsDisplayed()
-        composeRule.onNodeWithText("5 ÷ 0", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("5÷0", substring = true).assertIsDisplayed()
     }
 }
