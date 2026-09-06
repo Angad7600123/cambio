@@ -35,7 +35,11 @@ class ExpressionTransformationTest {
     fun `only the integer part is grouped`() = assertEquals("1,234.5678", transform("1234.5678").text.text)
 
     @Test
-    fun `operators get typographic glyphs and spacing`() = assertEquals("1,250 + 15", transform("1250+15").text.text)
+    fun `operators are set tight against their operands`() {
+        // No padding: the reference sets them this way, and a space appearing at full
+        // width in one frame is what made the line lurch when an operator was typed.
+        assertEquals("1,250+15", transform("1250+15").text.text)
+    }
 
     @Test
     fun `multiply and divide use their real glyphs`() {
@@ -44,7 +48,7 @@ class ExpressionTransformationTest {
     }
 
     @Test
-    fun `a unary minus is not spaced`() = assertEquals("8 × −2", transform("8*-2").text.text)
+    fun `a sign reads no differently from a subtraction`() = assertEquals("8×−2", transform("8*-2").text.text)
 
     @Test
     fun `operators are tinted`() {
@@ -74,11 +78,11 @@ class ExpressionTransformationTest {
     }
 
     @Test
-    fun `the caret maps across operator spacing`() {
-        // "1250+15" -> "1,250 + 15". The '+' is raw index 4, visual index 6.
+    fun `the caret maps across an operator`() {
+        // "1250+15" -> "1,250+15". The '+' is raw index 4, visual index 5.
         val mapping = transform("1250+15").offsetMapping
-        assertEquals(6, mapping.originalToTransformed(4))
-        assertEquals(4, mapping.transformedToOriginal(6))
+        assertEquals(5, mapping.originalToTransformed(4))
+        assertEquals(4, mapping.transformedToOriginal(5))
     }
 
     @Test
@@ -154,11 +158,11 @@ class ExpressionTransformationTest {
 
     @Test
     fun `an operator can be the growing glyph`() {
-        // "1250+15" -> "1,250 + 15": the '+' is raw 4, visual 6, and the spaces
-        // around it must not be swept into the span.
+        // "1250+15" -> "1,250+15": the '+' is raw 4, visual 5, and exactly one
+        // character wide.
         val span = scaleSpan(growing("1250+15", index = 4))
-        assertEquals(6, span.start)
-        assertEquals(7, span.end)
+        assertEquals(5, span.start)
+        assertEquals(6, span.end)
     }
 
     @Test

@@ -61,14 +61,17 @@ internal class ExpressionTransformation(
                 }
 
                 else -> {
-                    val glyph = glyphFor(char)
-                    val spaced = OperatorType.fromSymbol(char) != null && !isUnaryAt(raw, index)
-                    if (spaced) builder.append(' ')
-                    // Recorded after the leading space so the caret hugs the operator
-                    // rather than floating in the gutter before it.
+                    // No padding around operators. The reference sets them tight —
+                    // `2x2x2`, not `2 x 2 x 2` — and the spaces were not merely a
+                    // stylistic difference: each one was two characters' worth of
+                    // width appearing in a single frame, while the glyph between them
+                    // grew in over 180ms. The line lurched sideways every time an
+                    // operator was pressed, because part of its width was animated
+                    // and part of it simply appeared. The tint already separates the
+                    // operators from the digits without help from whitespace.
                     originalToTransformed[index] = builder.length
                     val start = builder.length
-                    builder.append(glyph)
+                    builder.append(glyphFor(char))
                     if (char in ACCENTED) {
                         spans += AnnotatedString.Range(
                             SpanStyle(color = operatorColor),
@@ -76,7 +79,6 @@ internal class ExpressionTransformation(
                             builder.length,
                         )
                     }
-                    if (spaced) builder.append(' ')
                     index++
                 }
             }
@@ -159,13 +161,6 @@ internal class ExpressionTransformation(
         var index = start
         while (index < text.length && (text[index].isDigit() || text[index] == '.')) index++
         return index
-    }
-
-    /** A minus is unary at the start, or after another operator or an open bracket. */
-    private fun isUnaryAt(text: String, index: Int): Boolean {
-        if (text[index] != OperatorType.SUBTRACT.symbol) return false
-        val previous = text.getOrNull(index - 1) ?: return true
-        return previous == '(' || OperatorType.fromSymbol(previous) != null
     }
 
     private fun glyphFor(char: Char): Char = when (char) {

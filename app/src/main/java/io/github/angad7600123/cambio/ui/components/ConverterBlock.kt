@@ -185,7 +185,10 @@ private fun FigureRow(
     )
     val animatedSize by animateFloatAsState(
         targetValue = fitted.value,
-        animationSpec = tween(durationMillis = RESIZE_MILLIS),
+        // The same fitted curve as the entry animation: a size change moves every
+        // glyph in the line, so it has to travel at the same rate as everything else
+        // or the two motions fight each other.
+        animationSpec = tween(durationMillis = RESIZE_MILLIS, easing = SmoothFlow),
         label = "figureFontSize",
     )
     // The idle figure steps between sizes outright. Easing it would set the whole

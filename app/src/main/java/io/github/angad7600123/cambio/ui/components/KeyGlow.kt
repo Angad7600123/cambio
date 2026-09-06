@@ -114,10 +114,18 @@ private class KeyGlowNode(private val interactionSource: InteractionSource, priv
 
         drawCircle(
             brush = Brush.radialGradient(
+                // Five stops, not three. The decay past the peak is what makes this
+                // read as light rather than as a drawn ring, and it needs enough
+                // stops to curve: measured off the reference, the brightness falls to
+                // roughly a half, then a quarter, then a tenth of its peak on the way
+                // out. Three stops gave a straight ramp to zero over a sixth of the
+                // key's radius, which is a hard edge — visibly a circle outline.
                 colorStops = arrayOf(
                     0f to color.copy(alpha = CENTRE_ALPHA * progress),
-                    edge * INNER_STOP to color.copy(alpha = CENTRE_ALPHA * progress),
+                    edge * INNER_STOP to color.copy(alpha = INNER_ALPHA * progress),
                     edge to color.copy(alpha = PEAK_ALPHA * progress),
+                    edge + (1f - edge) * 0.33f to color.copy(alpha = PEAK_ALPHA * 0.53f * progress),
+                    edge + (1f - edge) * 0.63f to color.copy(alpha = PEAK_ALPHA * 0.24f * progress),
                     1f to color.copy(alpha = 0f),
                 ),
                 center = center,
@@ -144,14 +152,25 @@ internal const val GLOW_FADE_IN_MILLIS = 40
  */
 internal const val GLOW_FADE_OUT_MILLIS = 110
 
-/** How far past the key's radius the halo reaches. */
-private const val HALO_SCALE = 1.16f
+/**
+ * How far past the key's radius the halo reaches.
+ *
+ * Measured against the reference, whose light carries about half a key-radius beyond
+ * the edge before it dies. At the previous 1.16 the whole outward fade had to happen
+ * within a sixth of a radius — about 16px on a real key — which is too short a
+ * distance to read as a fade at all.
+ */
+private const val HALO_SCALE = 1.5f
+
+/** Where the gradient starts brightening on its way out to the key's edge. */
+private const val INNER_STOP = 0.72f
 
 /**
- * Where the gradient starts brightening. Close to the edge, so the light reads as a
- * thin rim hugging the key rather than a soft cloud over it.
+ * The key's own face is not quite dark under a press.
+ *
+ * The reference shows the face lifting slightly along with the rim; leaving it at
+ * zero made the halo look detached from the key it belongs to.
  */
-private const val INNER_STOP = 0.82f
-
-private const val CENTRE_ALPHA = 0.0f
-private const val PEAK_ALPHA = 0.30f
+private const val CENTRE_ALPHA = 0.05f
+private const val INNER_ALPHA = 0.11f
+private const val PEAK_ALPHA = 0.34f
