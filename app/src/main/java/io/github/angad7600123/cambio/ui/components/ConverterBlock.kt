@@ -76,15 +76,12 @@ import kotlinx.coroutines.awaitCancellation
  * @param activeText the raw expression being typed, in the active currency.
  * @param activePreview the running total, shown small beneath the active figure only
  *   when an operation is in progress.
- * @param evaluatedExpression the expression that produced the current result, shown
- *   above after equals.
  */
 @Composable
 fun ConverterBlock(
     activeText: String,
     activeCursor: Int,
     activePreview: String,
-    evaluatedExpression: String,
     otherValue: String,
     from: CurrencyInfo,
     to: CurrencyInfo,
@@ -100,19 +97,6 @@ fun ConverterBlock(
     val sourceActive = activeSide == ConversionSide.SOURCE
 
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
-        // Only present after equals, where One UI puts the expression that produced
-        // the result above it.
-        if (evaluatedExpression.isNotEmpty()) {
-            Text(
-                text = evaluatedExpression,
-                style = CambioTextStyles.Secondary,
-                color = colors.textSecondary,
-                maxLines = 1,
-                textAlign = TextAlign.End,
-                modifier = Modifier.padding(bottom = 2.dp),
-            )
-        }
-
         FigureRow(
             text = if (sourceActive) activeText else otherValue,
             cursor = activeCursor,

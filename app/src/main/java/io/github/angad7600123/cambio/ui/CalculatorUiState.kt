@@ -50,7 +50,6 @@ data class CalculatorUiState(
      */
     val activePreview: String = "",
     /** After equals, the expression that produced the result. Blank while typing. */
-    val evaluatedExpression: String = "",
     /** The figure in the other currency. */
     val otherValue: String = "0",
     /** Which side the keypad is typing into; the other side is derived from it. */

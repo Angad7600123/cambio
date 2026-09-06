@@ -1,10 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Launcher icon background: a pale vertical gradient, so the icon reads as a light
+  tile whatever the wallpaper behind it. The launcher applies its own mask, so this
+  fills the whole 108dp and is never drawn square.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#FF17876B"
-        android:pathData="M0,0h108v108h-108z" />
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/aapt" name="android:fillColor">
+            <gradient
+                android:startX="54"
+                android:startY="0"
+                android:endX="54"
+                android:endY="108"
+                android:type="linear">
+                <item android:offset="0" android:color="#FFF4F6F8" />
+                <item android:offset="1" android:color="#FFC9CDD4" />
+            </gradient>
+        </aapt:attr>
+    </path>
 </vector>

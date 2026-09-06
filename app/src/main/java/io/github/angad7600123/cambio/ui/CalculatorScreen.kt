@@ -327,7 +327,6 @@ private fun DisplaySection(
             activeText = state.activeText,
             activeCursor = state.activeCursor,
             activePreview = state.activePreview,
-            evaluatedExpression = state.evaluatedExpression,
             otherValue = state.otherValue,
             from = state.fromCurrency,
             to = state.toCurrency,

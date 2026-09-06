@@ -61,8 +61,11 @@ type into, and a list that gives the name room and rules between the rows.
 - **Exact decimal arithmetic.** `0.1 + 0.2` is `0.3`, not `0.30000000000000004` —
   everything runs on `BigDecimal`, never binary floating point
 - Chained calculations, backspace and clear
-- **The expression leads while you type** and steps back once evaluated, with
-  operators tinted
+- **The expression leads while you type**, operators tinted, and equals leaves just
+  the answer — no expression lingering above a number that has moved on
+- **Equals repeats.** `2 × 2 =` gives 4; press it again for 8, again for 16. The last
+  operation is held over and reapplied to each result, as a pocket calculator does.
+  Pressing it on a plain number does nothing, because there is nothing to repeat
 - **Edit anywhere in the number.** A caret marks your place, with the platform's own
   drag handle beneath it to slide through a long figure. The soft keyboard never
   appears — the keypad is the only way in
@@ -101,7 +104,9 @@ type into, and a list that gives the name room and rules between the rows.
   from the widget's own size, so it stays legible as you resize it
 - Light and dark themes, following the system by default, with an optional
   Material You / system-colour mode that picks up your device or OEM theme
-- Calculation history (last 100), tap to restore
+- Calculation history (last 100), tap to restore. Only actual calculations are
+  filed, and only on equals: a number you typed and never operated on is not a
+  calculation and does not appear
 - Landscape and tablet layouts, not a locked-portrait phone app
 - Full TalkBack support and WCAG 2.1 AA contrast
 - Numbers formatted for your device locale — `1,234.5` or `1.234,5`, with the
@@ -276,13 +281,15 @@ real operator precedence for free, and it is why `CalculatorEngine.evaluate()`
 ./gradlew lintDebug                  # Android Lint
 ```
 
-261 unit tests and 27 instrumented tests. **No test ever contacts the real
+271 unit tests and 27 instrumented tests. **No test ever contacts the real
 exchange-rate API** — HTTP is served by a local `MockWebServer`, and the clock is
 injected so cache-expiry behaviour is asserted exactly rather than by sleeping.
 
 Coverage focuses on logic that can genuinely break:
 
 - Operator precedence, associativity, parentheses, unary minus
+- Which operation equals holds over to repeat, including that a sign is not a
+  subtraction and that an operator inside brackets is not the trailing one
 - Contextual percent in all four operator positions
 - Exact decimal arithmetic, non-terminating division, huge and tiny magnitudes
 - Every failure mode: division by zero, malformed input, overflow, empty

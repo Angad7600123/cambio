@@ -38,7 +38,6 @@ class CalculatorScreenTest {
 
     private fun state(
         activeText: String = "",
-        evaluatedExpression: String = "",
         preview: String = "",
         other: String = "945.40",
         rate: String? = "1 USD = 94.5405 INR",
@@ -51,7 +50,6 @@ class CalculatorScreenTest {
         activeText = activeText,
         activeCursor = activeText.length,
         activePreview = preview,
-        evaluatedExpression = evaluatedExpression,
         otherValue = other,
         fromCurrency = usd,
         toCurrency = inr,
@@ -148,11 +146,14 @@ class CalculatorScreenTest {
     }
 
     @Test
-    fun afterEqualsTheExpressionStepsBack() {
-        setScreen(state(activeText = "2468", evaluatedExpression = "1,234 × 2 ="))
+    fun afterEqualsOnlyTheResultAndItsConversionAreShown() {
+        // Equals leaves the number alone on the display. There used to be a small
+        // line above it repeating the expression, which went stale the moment a
+        // second equals moved the result on.
+        setScreen(state(activeText = "2468", preview = "", other = "233,204.15"))
 
         composeRule.onNodeWithText("2,468").assertIsDisplayed()
-        composeRule.onNodeWithText("1,234 × 2 =").assertIsDisplayed()
+        composeRule.onNodeWithText("233,204.15").assertIsDisplayed()
     }
 
     @Test

@@ -1,19 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Launcher icon foreground: a currency-exchange mark drawn as a vector so the app
-  ships no binary image assets.
+  Launcher icon foreground: a calculator that converts.
+
+  Two dark circles carry the arithmetic — a plus, and the pair of arrows that stand
+  for conversion — with the equals set apart in a jade pill, so the mark reads as a
+  calculator at a glance and as a currency one on a second look.
+
+  Every element sits inside a circle of radius 33 about the centre (54, 54); the
+  furthest point of any of them is 32 out. An adaptive icon is masked by the
+  launcher, and only that circle survives every mask, so the layout is tighter than
+  it would be on a fixed square tile — a full-bleed design would lose its corners on
+  a round one.
+
+  Drawn as strokes with round caps rather than filled rectangles: the ends are then
+  rounded for free, and stay rounded at every density.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Upper arrow, pointing right -->
+
+    <!-- Upper left: the plus key -->
     <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M34,44 L66,44 L66,38 L78,48 L66,58 L66,52 L34,52 Z" />
-    <!-- Lower arrow, pointing left -->
+        android:fillColor="#FF2E2E33"
+        android:pathData="M39,41 m-12,0 a12,12 0 1,0 24,0 a12,12 0 1,0 -24,0" />
     <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M74,64 L42,64 L42,58 L30,68 L42,78 L42,72 L74,72 Z" />
+        android:pathData="M33.5,41 L44.5,41 M39,35.5 L39,46.5"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3.4"
+        android:strokeLineCap="round" />
+
+    <!-- Lower left: the conversion arrows -->
+    <path
+        android:fillColor="#FF2E2E33"
+        android:pathData="M39,67 m-12,0 a12,12 0 1,0 24,0 a12,12 0 1,0 -24,0" />
+    <path
+        android:pathData="M33,63.5 L44.5,63.5 M41,60.4 L44.5,63.5 L41,66.6
+                          M45,70.5 L33.5,70.5 M37,67.4 L33.5,70.5 L37,73.6"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Right: the equals, set apart in the app's own jade -->
+    <path
+        android:fillColor="#FF17876B"
+        android:pathData="M57,40 a11,11 0 0,1 22,0 L79,68 a11,11 0 0,1 -22,0 Z" />
+    <path
+        android:pathData="M62.5,50 L73.5,50 M62.5,58 L73.5,58"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3.4"
+        android:strokeLineCap="round" />
 </vector>

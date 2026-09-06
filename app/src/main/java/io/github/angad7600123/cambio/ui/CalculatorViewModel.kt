@@ -33,9 +33,6 @@ import kotlinx.coroutines.launch
 import java.math.BigDecimal
 import java.math.RoundingMode
 
-/** A four-way tuple, since the standard library stops at [Triple]. */
-private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
-
 /**
  * Drives the calculator screen.
  *
@@ -56,9 +53,6 @@ class CalculatorViewModel(
 ) : ViewModel() {
     private val inputState = MutableStateFlow(InputState.Empty)
 
-    /** The expression that produced the currently displayed result, shown after `=`. */
-    private val evaluatedExpression = MutableStateFlow<String?>(null)
-
     /**
      * A failure to surface as a toast.
      *
@@ -77,13 +71,13 @@ class CalculatorViewModel(
     private val activeSide = MutableStateFlow(ConversionSide.SOURCE)
 
     val uiState: StateFlow<CalculatorUiState> = combine(
-        combine(inputState, evaluatedExpression, transientMessage, activeSide, ::Quad),
+        combine(inputState, transientMessage, activeSide, ::Triple),
         settingsRepository.settings,
         ratesRepository.snapshot,
         ratesRepository.refreshState,
         historyRepository.history,
-    ) { (input, evaluated, _, side), settings, snapshot, refreshState, history ->
-        buildUiState(input, evaluated, side, settings, snapshot, refreshState, history)
+    ) { (input, _, side), settings, snapshot, refreshState, history ->
+        buildUiState(input, side, settings, snapshot, refreshState, history)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
@@ -115,18 +109,14 @@ class CalculatorViewModel(
             return
         }
 
-        // Any other key leaves the "showing a finished result" mode.
-        if (before.justEvaluated || before.error != null) {
-            evaluatedExpression.value = null
-        }
         inputState.value = CalculatorInput.press(before, key)
     }
 
     private fun onEquals(before: InputState) {
-        // Nothing to do to a finished result, and nothing to record: repeating the
-        // press must not file the same answer again and again.
-        if (before.justEvaluated) return
-
+        // What the press will actually work on: the expression as typed, or — on a
+        // result — that result with the held-over operation appended, which is the
+        // string worth filing rather than the bare number it started from.
+        val evaluated = CalculatorInput.expressionToEvaluate(before) ?: return
         val after = CalculatorInput.press(before, CalculatorKey.Equals)
 
         if (after.error != null) {
@@ -136,11 +126,12 @@ class CalculatorViewModel(
         }
 
         inputState.value = after
-        if (after.justEvaluated) {
-            evaluatedExpression.value = before.expression
-            recordHistory(before.expression, after.expression)
-        } else {
-            evaluatedExpression.value = null
+
+        // History is a record of calculations, so only a calculation goes in it: an
+        // expression carrying an operator, and only ever on equals. Pressing equals
+        // on a number that has not been operated on has computed nothing.
+        if (after.justEvaluated && !CalculatorInput.isPlainNumber(evaluated)) {
+            recordHistory(evaluated, after.expression)
         }
     }
 
@@ -178,7 +169,6 @@ class CalculatorViewModel(
                     if (side == ConversionSide.SOURCE) settings.fromCurrency else settings.toCurrency,
                 ).minorUnits
                 inputState.value = InputState.atEnd(carried.asInput(minorUnits))
-                evaluatedExpression.value = null
             }
         }
     }
@@ -220,7 +210,6 @@ class CalculatorViewModel(
     /** Restores a past calculation into the display. */
     fun onRestoreHistory(entry: HistoryEntry) {
         inputState.value = InputState.atEnd(entry.expression)
-        evaluatedExpression.value = null
     }
 
     /** Explicit user-initiated refresh, used by the rate line and the error retry. */
@@ -266,7 +255,6 @@ class CalculatorViewModel(
 
     private fun buildUiState(
         input: InputState,
-        evaluated: String?,
         side: ConversionSide,
         settings: UserSettings,
         snapshot: RateSnapshot?,
@@ -286,7 +274,8 @@ class CalculatorViewModel(
         }
 
         val previewText = value?.let(numberFormatter::format) ?: ZERO_DISPLAY
-        val isEditing = evaluated == null
+        // A finished result stands on its own; the running total belongs to typing.
+        val isEditing = !input.justEvaluated
 
         return CalculatorUiState(
             // The raw expression drives the field; the visual transformation adds
@@ -303,9 +292,6 @@ class CalculatorViewModel(
             } else {
                 ""
             },
-            evaluatedExpression = evaluated
-                ?.let { expressionFormatter.format(it) + EQUALS_SUFFIX }
-                .orEmpty(),
             otherValue = otherAmount
                 ?.let { numberFormatter.formatMoney(it, otherCurrency) }
                 ?: PLACEHOLDER,
@@ -406,6 +392,5 @@ class CalculatorViewModel(
         const val STOP_TIMEOUT_MILLIS = 5_000L
         const val ZERO_DISPLAY = "0"
         const val PLACEHOLDER = "\u2014"
-        const val EQUALS_SUFFIX = " ="
     }
 }

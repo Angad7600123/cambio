@@ -2,6 +2,7 @@ package io.github.angad7600123.cambio.calculator
 
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -222,8 +223,10 @@ class CalculatorInputTest {
 
     @Test
     fun `chained equals presses recompute from the shown result`() {
+        // 2+3 is 5, and the held-over +3 then makes it 8. This used to assert 5,
+        // back when a second equals re-evaluated the answer and got the answer.
         val state = type(*digits("2+3"), CalculatorKey.Equals, CalculatorKey.Equals)
-        assertEquals("5", state.expression)
+        assertEquals("8", state.expression)
     }
 
     @Test
@@ -269,35 +272,117 @@ class CalculatorInputTest {
 
     // region Repeated equals
 
-    @Test
-    fun `equals on a finished result changes nothing`() {
-        // The crash this guards: each extra press used to re-evaluate the answer and
-        // file it as a new calculation, so three quick taps left three identical
-        // history entries stamped with the same second.
-        val evaluated = CalculatorInput.press(InputState.atEnd("2+3"), CalculatorKey.Equals)
-        assertEquals("5", evaluated.expression)
+    private fun equalsOn(expression: String) = CalculatorInput.press(InputState.atEnd(expression), CalculatorKey.Equals)
 
-        val again = CalculatorInput.press(evaluated, CalculatorKey.Equals)
-        assertEquals(evaluated, again)
+    @Test
+    fun `equals again repeats the last operation on the result`() {
+        // The pocket-calculator behaviour: 2x2 gives 4, and pressing equals again
+        // applies the same x2 to the answer.
+        var state = equalsOn("2*2")
+        assertEquals("4", state.expression)
+
+        state = CalculatorInput.press(state, CalculatorKey.Equals)
+        assertEquals("8", state.expression)
+
+        state = CalculatorInput.press(state, CalculatorKey.Equals)
+        assertEquals("16", state.expression)
     }
 
     @Test
-    fun `equals stays a no-op however many times it is pressed`() {
-        var state = CalculatorInput.press(InputState.atEnd("12+8"), CalculatorKey.Equals)
-        repeat(5) { state = CalculatorInput.press(state, CalculatorKey.Equals) }
-        assertEquals("20", state.expression)
+    fun `repeating leaves only the number, never the operation`() {
+        val state = CalculatorInput.press(equalsOn("2+3"), CalculatorKey.Equals)
+        assertEquals("8", state.expression)
         assertTrue(state.justEvaluated)
     }
 
     @Test
-    fun `typing after equals makes equals work again`() {
-        // The guard keys on justEvaluated, which any other keypress clears, so a new
-        // expression built on the result still evaluates.
-        val evaluated = CalculatorInput.press(InputState.atEnd("2+3"), CalculatorKey.Equals)
-        var state = CalculatorInput.press(evaluated, CalculatorKey.Operator(OperatorType.MULTIPLY))
-        state = CalculatorInput.press(state, CalculatorKey.Digit(4))
+    fun `the repeated operation is the last one, not the first`() {
+        // 2+3x4 is 14 by precedence, and x4 is what repeats.
+        val state = CalculatorInput.press(equalsOn("2+3*4"), CalculatorKey.Equals)
+        assertEquals("56", state.expression)
+    }
+
+    @Test
+    fun `equals on a plain number does nothing at all`() {
+        val evaluated = equalsOn("7")
+        assertEquals("7", evaluated.expression)
+        assertEquals(evaluated, CalculatorInput.press(evaluated, CalculatorKey.Equals))
+    }
+
+    @Test
+    fun `typing after equals replaces the operation to repeat`() {
+        var state = equalsOn("2*2")
+        state = CalculatorInput.press(state, CalculatorKey.Operator(OperatorType.ADD))
+        state = CalculatorInput.press(state, CalculatorKey.Digit(1))
         state = CalculatorInput.press(state, CalculatorKey.Equals)
-        assertEquals("20", state.expression)
+        assertEquals("5", state.expression)
+
+        // The held-over operation is now +1, not x2.
+        state = CalculatorInput.press(state, CalculatorKey.Equals)
+        assertEquals("6", state.expression)
+    }
+
+    @Test
+    fun `clearing forgets the operation to repeat`() {
+        var state = equalsOn("2*2")
+        state = CalculatorInput.press(state, CalculatorKey.Clear)
+        state = CalculatorInput.press(state, CalculatorKey.Digit(9))
+        state = CalculatorInput.press(state, CalculatorKey.Equals)
+        assertEquals("9", state.expression)
+        assertNull(state.repeat)
+    }
+
+    // endregion
+
+    // region The operation equals holds over
+
+    @Test
+    fun `the trailing operation is the last operator and everything after it`() {
+        assertEquals(RepeatOp(OperatorType.MULTIPLY, "2"), CalculatorInput.trailingOperation("2*2"))
+        assertEquals(RepeatOp(OperatorType.ADD, "15%"), CalculatorInput.trailingOperation("1250+15%"))
+    }
+
+    @Test
+    fun `a plain number has no trailing operation`() {
+        assertNull(CalculatorInput.trailingOperation("250"))
+        assertNull(CalculatorInput.trailingOperation("-250"))
+    }
+
+    @Test
+    fun `a dangling operator has no operand to repeat`() {
+        assertNull(CalculatorInput.trailingOperation("5+"))
+    }
+
+    @Test
+    fun `a sign is not mistaken for a subtraction`() {
+        // The minus in 2x-3 belongs to the 3; the operation is x -3.
+        assertEquals(RepeatOp(OperatorType.MULTIPLY, "-3"), CalculatorInput.trailingOperation("2*-3"))
+    }
+
+    @Test
+    fun `an operator inside brackets is not the trailing one`() {
+        assertEquals(RepeatOp(OperatorType.MULTIPLY, "(3+4)"), CalculatorInput.trailingOperation("2*(3+4)"))
+        assertEquals(RepeatOp(OperatorType.ADD, "5"), CalculatorInput.trailingOperation("(2*3)+5"))
+    }
+
+    // endregion
+
+    // region What counts as a calculation
+
+    @Test
+    fun `a bare number is not a calculation`() {
+        assertTrue(CalculatorInput.isPlainNumber("250"))
+        assertTrue(CalculatorInput.isPlainNumber("0.5"))
+        // A sign is not an operation either: -5 has calculated nothing.
+        assertTrue(CalculatorInput.isPlainNumber("-42"))
+    }
+
+    @Test
+    fun `anything with an operator is a calculation`() {
+        assertFalse(CalculatorInput.isPlainNumber("12+8"))
+        assertFalse(CalculatorInput.isPlainNumber("50%"))
+        assertFalse(CalculatorInput.isPlainNumber("(2+3)"))
+        assertFalse(CalculatorInput.isPlainNumber("2*-3"))
     }
 
     // endregion

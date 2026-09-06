@@ -1,6 +1,15 @@
 package io.github.angad7600123.cambio.calculator
 
 /**
+ * A binary operation held over so `=` can apply it again.
+ *
+ * @property operator the operator to reapply.
+ * @property operand its right-hand side, exactly as typed — `15%` stays `15%`, so
+ *   repeating a percentage keeps working against each new running total.
+ */
+data class RepeatOp(val operator: OperatorType, val operand: String)
+
+/**
  * The immutable state of what the user has typed.
  *
  * @property expression the canonical expression string (internal alphabet).
@@ -11,12 +20,17 @@ package io.github.angad7600123.cambio.calculator
  *   keypress means: a digit starts a fresh calculation, an operator continues from
  *   the result.
  * @property error set when the last evaluation failed.
+ * @property repeat the operation the next `=` would apply again, as a pocket
+ *   calculator does: `2×2=` gives 4, and pressing `=` again gives 8. Set when an
+ *   expression is evaluated and cleared by anything typed afterwards, because
+ *   [insert] rebuilds the state rather than copying it.
  */
 data class InputState(
     val expression: String = "",
     val cursor: Int = expression.length,
     val justEvaluated: Boolean = false,
     val error: CalcError? = null,
+    val repeat: RepeatOp? = null,
 ) {
     val isEmpty: Boolean get() = expression.isEmpty()
 
@@ -61,6 +75,66 @@ object CalculatorInput {
     fun digitsAtCaret(state: InputState): Int {
         val base = if (state.justEvaluated || state.error != null) InputState.Empty else state
         return numberDigitsAround(base)
+    }
+
+    /**
+     * The expression a press of `=` would evaluate, or null if it would do nothing.
+     *
+     * On a fresh expression that is simply what was typed. On a result it is the
+     * result with the held-over operation appended, which is what makes `2×2=` then
+     * `=` give 8 rather than 4 again. The view model needs the same string to file
+     * in the history, and deriving it twice would be two chances to disagree.
+     */
+    fun expressionToEvaluate(state: InputState): String? {
+        if (state.expression.isEmpty()) return null
+        if (!state.justEvaluated) return state.expression
+        val repeat = state.repeat ?: return null
+        return state.expression + repeat.operator.symbol + repeat.operand
+    }
+
+    /**
+     * Whether [expression] is a bare number rather than a calculation.
+     *
+     * A signed literal counts as bare: typing `-5` and pressing equals has not
+     * calculated anything, and filing it in the history would be noise.
+     */
+    fun isPlainNumber(expression: String): Boolean {
+        val body = expression.removePrefix(OperatorType.SUBTRACT.symbol.toString())
+        return body.isNotEmpty() && body.all { it.isDigit() || it == Lexer.DECIMAL_POINT }
+    }
+
+    /**
+     * The last binary operation in [expression], for `=` to repeat.
+     *
+     * Scans from the right, ignoring anything inside brackets and skipping a minus
+     * that is a sign rather than a subtraction, so `2×-3` yields `× -3` and not
+     * `− 3`. Returns null when there is no operation to repeat, which is what makes
+     * pressing `=` on a plain number do nothing at all.
+     */
+    internal fun trailingOperation(expression: String): RepeatOp? {
+        var depth = 0
+        for (index in expression.indices.reversed()) {
+            when (val char = expression[index]) {
+                ')' -> depth++
+                '(' -> depth--
+                else -> {
+                    if (depth != 0) continue
+                    val operator = OperatorType.fromSymbol(char) ?: continue
+                    if (isUnaryMinusAt(expression, index)) continue
+                    return expression.substring(index + 1)
+                        .takeIf { it.isNotEmpty() }
+                        ?.let { RepeatOp(operator, it) }
+                }
+            }
+        }
+        return null
+    }
+
+    /** A minus is a sign, not a subtraction, at the start or after another operator. */
+    private fun isUnaryMinusAt(expression: String, index: Int): Boolean {
+        if (expression[index] != OperatorType.SUBTRACT.symbol) return false
+        val previous = expression.getOrNull(index - 1) ?: return true
+        return previous == '(' || isOperatorChar(previous)
     }
 
     fun press(state: InputState, key: CalculatorKey): InputState = when (key) {
@@ -189,15 +263,16 @@ object CalculatorInput {
     }
 
     private fun equals(state: InputState): InputState {
-        if (state.expression.isEmpty()) return state
-        // A result is already final: equals has nothing left to do with it. Without
-        // this, pressing equals on `5` re-evaluates `5` and calls the answer a fresh
-        // calculation, which put duplicate entries in the history.
-        if (state.justEvaluated) return state
+        val toEvaluate = expressionToEvaluate(state) ?: return state
+        // A repeat keeps the operation it is repeating; a fresh evaluation adopts
+        // whatever trailed the expression just typed.
+        val repeat = if (state.justEvaluated) state.repeat else trailingOperation(state.expression)
 
-        return when (val result = CalculatorEngine.evaluate(state.expression)) {
-            is CalcResult.Success ->
-                InputState.atEnd(result.value.toPlainString(), justEvaluated = true)
+        return when (val result = CalculatorEngine.evaluate(toEvaluate)) {
+            is CalcResult.Success -> {
+                val text = result.value.toPlainString()
+                InputState(expression = text, cursor = text.length, justEvaluated = true, repeat = repeat)
+            }
 
             is CalcResult.Failure ->
                 state.copy(justEvaluated = false, error = result.error)
