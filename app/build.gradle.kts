@@ -32,9 +32,10 @@ fun signingSecret(
 val keystorePath = signingSecret("cambio.keystore.file", "CAMBIO_KEYSTORE_FILE")
 val keystorePassword = signingSecret("cambio.keystore.password", "CAMBIO_KEYSTORE_PASSWORD")
 val keystoreAlias = signingSecret("cambio.key.alias", "CAMBIO_KEY_ALIAS")
-val keyPassword = signingSecret("cambio.key.password", "CAMBIO_KEY_PASSWORD")
+val keystoreKeyPassword = signingSecret("cambio.key.password", "CAMBIO_KEY_PASSWORD")
 val hasSigningMaterial =
-    keystorePath != null && keystorePassword != null && keystoreAlias != null && keyPassword != null
+    keystorePath != null && keystorePassword != null &&
+        keystoreAlias != null && keystoreKeyPassword != null
 
 android {
     namespace = "io.github.angad7600123.cambio"
@@ -54,10 +55,17 @@ android {
     signingConfigs {
         if (hasSigningMaterial) {
             create("release") {
+                // Every one of these values is named differently from the property
+                // it is assigned to, on purpose. Inside this block the receiver's
+                // own names win, so a variable called `keyPassword` here would
+                // resolve to the property being assigned and quietly set it to
+                // itself. That fails only on the signed path -- an unsigned build
+                // never touches it -- so it would have got all the way to the first
+                // real release before anyone found out.
                 storeFile = file(keystorePath!!)
                 storePassword = keystorePassword
                 keyAlias = keystoreAlias
-                this.keyPassword = keyPassword
+                keyPassword = keystoreKeyPassword
             }
         }
     }
