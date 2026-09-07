@@ -1,9 +1,40 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
+
+/**
+ * Signing material, which is never committed.
+ *
+ * It is read from `local.properties` for a local build, or from the environment
+ * for CI, and if neither supplies it the release build simply stays unsigned --
+ * so a fresh clone with no keystore still builds and still passes CI. Nothing
+ * here has a default: a wrong default would silently produce an APK signed with
+ * the wrong key, which is worse than one that is not signed at all.
+ *
+ * See RELEASING.md for how to create the keystore and where to put the values.
+ */
+val signingProperties =
+    Properties().apply {
+        val file = rootProject.file("local.properties")
+        if (file.exists()) file.inputStream().use(::load)
+    }
+
+fun signingSecret(
+    property: String,
+    environment: String,
+): String? = (signingProperties.getProperty(property) ?: System.getenv(environment))?.takeIf { it.isNotBlank() }
+
+val keystorePath = signingSecret("cambio.keystore.file", "CAMBIO_KEYSTORE_FILE")
+val keystorePassword = signingSecret("cambio.keystore.password", "CAMBIO_KEYSTORE_PASSWORD")
+val keystoreAlias = signingSecret("cambio.key.alias", "CAMBIO_KEY_ALIAS")
+val keyPassword = signingSecret("cambio.key.password", "CAMBIO_KEY_PASSWORD")
+val hasSigningMaterial =
+    keystorePath != null && keystorePassword != null && keystoreAlias != null && keyPassword != null
 
 android {
     namespace = "io.github.angad7600123.cambio"
@@ -14,10 +45,21 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0.0"
+        versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
+    }
+
+    signingConfigs {
+        if (hasSigningMaterial) {
+            create("release") {
+                storeFile = file(keystorePath!!)
+                storePassword = keystorePassword
+                keyAlias = keystoreAlias
+                this.keyPassword = keyPassword
+            }
+        }
     }
 
     buildTypes {
@@ -32,8 +74,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            // No signing config is committed. Release builds are unsigned by design;
-            // supply your own keystore locally to produce a distributable artifact.
+            // Signed only when a keystore has actually been supplied. No keystore,
+            // no signature -- the build still succeeds, and the APK it produces is
+            // plainly uninstallable rather than quietly signed with something else.
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 

@@ -1,0 +1,92 @@
+name: Release
+
+# Pushing a version tag builds the release APK and attaches it to a draft
+# release. Draft, deliberately: the tag is the trigger, but publishing stays a
+# human decision, so a tag pushed by mistake never becomes a public download.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # The same gate main has to pass. A tag is not a reason to skip it — this is
+      # the one build people actually install.
+      - name: Check formatting
+        run: ./gradlew spotlessCheck --no-daemon
+
+      - name: Android Lint
+        run: ./gradlew lintDebug --no-daemon
+
+      - name: Unit tests
+        run: ./gradlew testDebugUnitTest --no-daemon
+
+      # The keystore lives in a secret as base64 and exists only for this job, on
+      # this runner. It is written outside the workspace so it cannot be picked up
+      # by a build step or uploaded with the artifacts.
+      - name: Restore the keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::KEYSTORE_BASE64 is not set. See RELEASING.md."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/cambio-release.jks"
+
+      - name: Assemble release
+        env:
+          CAMBIO_KEYSTORE_FILE: ${{ runner.temp }}/cambio-release.jks
+          CAMBIO_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          CAMBIO_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          CAMBIO_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --no-daemon
+
+      # An unsigned APK builds perfectly happily and then refuses to install, so
+      # the signature is checked here rather than discovered by whoever downloads
+      # it. This also fails the job if a secret was missing or wrong.
+      - name: Verify the APK is signed
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -r | head -n 1)
+          "$APKSIGNER" verify --verbose app/build/outputs/apk/release/app-release.apk
+
+      - name: Name the artifact after the tag
+        run: |
+          mkdir -p artifacts
+          cp app/build/outputs/apk/release/app-release.apk \
+             "artifacts/cambio-${GITHUB_REF_NAME}.apk"
+
+      - name: Shred the keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/cambio-release.jks"
+
+      # `gh` ships on the runner, so the one build people actually install does not
+      # depend on a third-party action having stayed trustworthy since it was pinned.
+      - name: Draft the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --draft \
+            --generate-notes \
+            --title "Cambio $GITHUB_REF_NAME" \
+            artifacts/cambio-*.apk
