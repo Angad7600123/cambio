@@ -18,4 +18,14 @@
     <color name="widget_accent">#FF0F6E56</color>
     <color name="widget_text_primary">#FF000000</color>
     <color name="widget_text_secondary">#FF6C6C70</color>
+
+    <!--
+      Press feedback, tinted with each key's own glyph colour so the widget speaks
+      the same language as the app's halo: coral for the destructive pair, white on
+      the filled equals, plain foreground everywhere else. A ripple washes the whole
+      face rather than ringing the edge, so these sit below the app's peak alpha.
+    -->
+    <color name="widget_ripple">#331A1A1C</color>
+    <color name="widget_ripple_destructive">#40B3392A</color>
+    <color name="widget_ripple_on_accent">#3DFFFFFF</color>
 </resources>

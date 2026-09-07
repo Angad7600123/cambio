@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Press feedback for a round key.
+
+  Glance's default is `?android:attr/selectableItemBackground`, which is an
+  unbounded rectangular ripple. On a circular key that reads as a grey square
+  flashing behind the glyph, with the ripple spilling past the key's edge — which
+  is exactly what it looked like. The oval mask clips the ripple to the key.
+
+  The tint is the key's own glyph colour, which is how the app's halo works: coral
+  for the destructive pair, jade for equals, plain foreground for the rest.
+-->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/widget_ripple">
+    <item android:id="@android:id/mask">
+        <shape android:shape="oval">
+            <solid android:color="#FFFFFFFF" />
+        </shape>
+    </item>
+</ripple>

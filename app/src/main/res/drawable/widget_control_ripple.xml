@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Press feedback for the controls in the display: the swap glyph, the two figures
+  and the two currency codes.
+
+  These are bare text, not keys, so the mask is a rounded rectangle around the
+  word rather than a circle. Without it they took the same unbounded rectangular
+  ripple the keys did, and a hard grey box appeared behind the currency code.
+-->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/widget_ripple">
+    <item android:id="@android:id/mask">
+        <shape android:shape="rectangle">
+            <corners android:radius="8dp" />
+            <solid android:color="#FFFFFFFF" />
+        </shape>
+    </item>
+</ripple>

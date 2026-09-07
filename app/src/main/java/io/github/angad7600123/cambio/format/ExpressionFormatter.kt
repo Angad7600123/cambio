@@ -19,7 +19,20 @@ class ExpressionFormatter(
     private val locale: Locale = Locale.getDefault(),
 ) {
     /** Converts a canonical expression into its on-screen representation. */
-    fun format(expression: String): String {
+    fun format(expression: String): String = render(expression, spaceOperators = true)
+
+    /**
+     * The same expression with its operators tight against their operands.
+     *
+     * This is the form the calculator's own display uses — `1,250+15`, not
+     * `1,250 + 15` — and the widget wants it for the same reason the app does,
+     * with one of its own on top: a widget figure has half the width of a phone
+     * display to work in, and two spaces per operator is width it cannot spare.
+     * The operator glyphs are distinct enough to separate the operands unaided.
+     */
+    fun formatCompact(expression: String): String = render(expression, spaceOperators = false)
+
+    private fun render(expression: String, spaceOperators: Boolean): String {
         if (expression.isEmpty()) return ""
 
         val builder = StringBuilder(expression.length + expression.length / 2)
@@ -44,9 +57,12 @@ class ExpressionFormatter(
 
                 else -> {
                     // Binary operators get breathing room; a unary minus stays tight
-                    // against its number, so "8 × -2" reads correctly.
+                    // against its number, so "8 × −2" reads correctly.
                     val glyph = glyphFor(char)
-                    if (OperatorType.fromSymbol(char) != null && !isUnaryAt(expression, index)) {
+                    if (spaceOperators &&
+                        OperatorType.fromSymbol(char) != null &&
+                        !isUnaryAt(expression, index)
+                    ) {
                         builder.append(' ').append(glyph).append(' ')
                     } else {
                         builder.append(glyph)

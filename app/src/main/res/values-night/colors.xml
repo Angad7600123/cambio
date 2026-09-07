@@ -7,4 +7,8 @@
     <color name="widget_accent">#FF187D6F</color>
     <color name="widget_text_primary">#FFFBFBFB</color>
     <color name="widget_text_secondary">#FF8E8E93</color>
+
+    <color name="widget_ripple">#2EFFFFFF</color>
+    <color name="widget_ripple_destructive">#3DEF6670</color>
+    <color name="widget_ripple_on_accent">#3DFFFFFF</color>
 </resources>
