@@ -34,8 +34,10 @@ val keystorePassword = signingSecret("cambio.keystore.password", "CAMBIO_KEYSTOR
 val keystoreAlias = signingSecret("cambio.key.alias", "CAMBIO_KEY_ALIAS")
 val keystoreKeyPassword = signingSecret("cambio.key.password", "CAMBIO_KEY_PASSWORD")
 val hasSigningMaterial =
-    keystorePath != null && keystorePassword != null &&
-        keystoreAlias != null && keystoreKeyPassword != null
+    keystorePath != null &&
+        keystorePassword != null &&
+        keystoreAlias != null &&
+        keystoreKeyPassword != null
 
 android {
     namespace = "io.github.angad7600123.cambio"
