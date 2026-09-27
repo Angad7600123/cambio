@@ -22,6 +22,10 @@ local.properties
 *.jks
 *.keystore
 keystore.properties
+# A base64-encoded keystore is the keystore. Encoding is not encryption, and
+# this repository is public, so the intermediate file gets the same treatment
+# as the key it was made from.
+*.b64
 
 # IDE
 .idea/
