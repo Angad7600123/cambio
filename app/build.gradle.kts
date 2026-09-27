@@ -68,6 +68,14 @@ android {
                 storePassword = keystorePassword
                 keyAlias = keystoreAlias
                 keyPassword = keystoreKeyPassword
+
+                // AGP leaves v3 off unless asked. v2 alone installs perfectly well
+                // above API 24, so nothing would have looked wrong -- but v3 is what
+                // carries a signing-certificate lineage, and that is the mechanism
+                // for ever moving to a different key. The first release is the one
+                // release that settles this for good, so it is settled here.
+                enableV2Signing = true
+                enableV3Signing = true
             }
         }
     }
