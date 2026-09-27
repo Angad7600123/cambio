@@ -3,6 +3,12 @@ name: Release
 # Pushing a version tag builds the release APK and attaches it to a draft
 # release. Draft, deliberately: the tag is the trigger, but publishing stays a
 # human decision, so a tag pushed by mistake never becomes a public download.
+#
+# Releases can also be cut by hand, with the key never leaving the maintainer's
+# machine — see RELEASING.md. That is a supported route, not a workaround, so a
+# repository with no signing secrets configured skips this rather than failing:
+# publishing a hand-built draft creates its tag, and a red cross on a release
+# that actually succeeded is worse than no run at all.
 on:
   push:
     tags:
@@ -12,8 +18,31 @@ permissions:
   contents: write
 
 jobs:
+  signing:
+    name: Check for a signing key
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+
+    steps:
+      - name: Look for a keystore secret
+        id: check
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No signing key is configured, so this tag was not built here. \
+            If the release was built and uploaded by hand, nothing is wrong. To have tags \
+            build themselves instead, add the four KEYSTORE_* secrets described in RELEASING.md."
+          fi
+
   release:
     name: Build and publish
+    needs: signing
+    if: needs.signing.outputs.configured == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -40,18 +69,30 @@ jobs:
       - name: Unit tests
         run: ./gradlew testDebugUnitTest --no-daemon
 
-      # The keystore lives in a secret as base64 and exists only for this job, on
-      # this runner. It is written outside the workspace so it cannot be picked up
-      # by a build step or uploaded with the artifacts.
+      # A keystore with no password to open it is a misconfiguration, not a
+      # choice, so unlike a wholly absent key this is loud.
+      - name: Check the rest of the signing material
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          missing=""
+          [ -z "$KEYSTORE_PASSWORD" ] && missing="$missing KEYSTORE_PASSWORD"
+          [ -z "$KEY_ALIAS" ] && missing="$missing KEY_ALIAS"
+          [ -z "$KEY_PASSWORD" ] && missing="$missing KEY_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::KEYSTORE_BASE64 is set but these are not:$missing. See RELEASING.md."
+            exit 1
+          fi
+
+      # The keystore exists only for this job, on this runner. It is written
+      # outside the workspace so it cannot be picked up by a build step or
+      # uploaded with the artifacts.
       - name: Restore the keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-        run: |
-          if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::error::KEYSTORE_BASE64 is not set. See RELEASING.md."
-            exit 1
-          fi
-          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/cambio-release.jks"
+        run: echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/cambio-release.jks"
 
       - name: Assemble release
         env:
@@ -63,7 +104,7 @@ jobs:
 
       # An unsigned APK builds perfectly happily and then refuses to install, so
       # the signature is checked here rather than discovered by whoever downloads
-      # it. This also fails the job if a secret was missing or wrong.
+      # it. This also fails the job if a secret was wrong.
       - name: Verify the APK is signed
         run: |
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -r | head -n 1)
