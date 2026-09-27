@@ -56,12 +56,16 @@ needs the same four values as repository secrets, under
 To produce the base64 on Windows (PowerShell):
 
 ```powershell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("$HOME\keys\cambio-release.jks")) | Set-Content keystore.b64
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("$HOME\cambio-release.jks")) | Set-Content "$HOME\keystore.b64"
 ```
 
-Paste the contents of `keystore.b64` into the secret, then delete the file. The
-workflow decodes it to the runner's temp directory, outside the workspace, and
-shreds it afterwards whether the build passed or failed.
+Note the destination: **outside the repository**. Base64 is an encoding, not
+encryption, so that file is the keystore. `.gitignore` covers `*.b64` as well,
+but the rule is the second line of defence, not the first.
+
+Paste its contents into the secret, then delete it. The workflow decodes the
+secret to the runner's temp directory, outside the workspace, and shreds it
+afterwards whether the build passed or failed.
 
 ## Cutting a release
 
